@@ -46,7 +46,7 @@ export default function AdminDashboardClient({
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState("");
   const [newPlayerRole, setNewPlayerRole] = useState<"PLAYER" | "MODERATOR" | "ADMIN">("PLAYER");
-  const [newPlayerAvatar, setNewPlayerAvatar] = useState("");
+  const [newPlayerSecretKey, setNewPlayerSecretKey] = useState("");
   const [playerActionMsg, setPlayerActionMsg] = useState("");
   const [loadingPlayerId, setLoadingPlayerId] = useState<string | null>(null);
 
@@ -92,8 +92,8 @@ export default function AdminDashboardClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newPlayerName.trim(),
-          avatarUrl: newPlayerAvatar.trim() || undefined,
           role: newPlayerRole,
+          secretKey: newPlayerSecretKey.trim() || undefined,
         }),
       });
 
@@ -101,9 +101,9 @@ export default function AdminDashboardClient({
       if (res.ok && data.player) {
         setPlayers((prev) => [...prev, data.player]);
         setNewPlayerName("");
-        setNewPlayerAvatar("");
+        setNewPlayerSecretKey("");
         setShowAddPlayer(false);
-        setPlayerActionMsg("Player added successfully.");
+        setPlayerActionMsg("Player created successfully.");
       } else {
         setPlayerActionMsg(data.error || "Failed to add player.");
       }
@@ -111,6 +111,7 @@ export default function AdminDashboardClient({
       setPlayerActionMsg("Error creating player.");
     }
   };
+
 
   // Update player role or status
   const handleUpdatePlayer = async (
@@ -421,21 +422,8 @@ export default function AdminDashboardClient({
                     type="text"
                     value={newPlayerName}
                     onChange={(e) => setNewPlayerName(e.target.value)}
-                    placeholder="e.g. Maverick"
+                    placeholder="e.g. Kunal"
                     required
-                    className="w-full bg-surface-container border border-surface-container-high rounded-lg px-3 py-2.5 font-label-caps text-label-caps text-on-surface focus:outline-none focus:border-primary"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-label-caps text-xs text-on-surface-variant uppercase">
-                    Avatar URL (Optional)
-                  </label>
-                  <input
-                    type="url"
-                    value={newPlayerAvatar}
-                    onChange={(e) => setNewPlayerAvatar(e.target.value)}
-                    placeholder="https://example.com/avatar.jpg"
                     className="w-full bg-surface-container border border-surface-container-high rounded-lg px-3 py-2.5 font-label-caps text-label-caps text-on-surface focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -456,6 +444,19 @@ export default function AdminDashboardClient({
                     <option value="ADMIN">ADMIN</option>
                   </select>
                 </div>
+
+                <div className="space-y-1">
+                  <label className="font-label-caps text-xs text-on-surface-variant uppercase">
+                    Secret Key
+                  </label>
+                  <input
+                    type="text"
+                    value={newPlayerSecretKey}
+                    onChange={(e) => setNewPlayerSecretKey(e.target.value)}
+                    placeholder="e.g. FRAGX-KUNAL-4821"
+                    className="w-full bg-surface-container border border-surface-container-high rounded-lg px-3 py-2.5 font-label-caps text-label-caps text-on-surface focus:outline-none focus:border-primary font-mono"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end pt-2">
@@ -463,9 +464,10 @@ export default function AdminDashboardClient({
                   type="submit"
                   className="bg-primary text-on-primary font-label-caps text-label-caps px-6 py-2.5 rounded-lg uppercase font-bold"
                 >
-                  Save Player
+                  Create Player
                 </button>
               </div>
+
             </form>
           )}
 

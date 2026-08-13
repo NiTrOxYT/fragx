@@ -4,8 +4,9 @@ import { createPlayer, getAllPlayers } from "@/lib/services/players";
 import { z } from "zod";
 
 const createPlayerSchema = z.object({
-  name: z.string().min(1, "Player name is required"),
-  avatarUrl: z.string().optional(),
+  name: z.string().min(1, "Gamertag is required"),
+  role: z.enum(["PLAYER", "MODERATOR", "ADMIN"]).optional(),
+  secretKey: z.string().optional(),
 });
 
 export async function GET() {
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = createPlayerSchema.parse(body);
 
-    const player = await createPlayer(parsed.name, parsed.avatarUrl);
+    const player = await createPlayer(parsed.name, parsed.secretKey, parsed.role);
     return NextResponse.json({ player }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json(
@@ -32,3 +33,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

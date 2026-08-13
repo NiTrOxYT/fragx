@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { cryptoNative } from "@/lib/auth-crypto";
 
 export type PlayerRole = "PLAYER" | "MODERATOR" | "ADMIN";
 
@@ -90,15 +91,26 @@ export async function getPlayerById(id: string) {
   };
 }
 
-export async function createPlayer(name: string, avatarUrl?: string, role?: PlayerRole): Promise<PlayerRecord> {
+export async function createPlayer(
+  name: string,
+  secretKey?: string,
+  role?: PlayerRole
+): Promise<PlayerRecord> {
   const defaultAvatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}`;
+  const keyToUse =
+    secretKey && secretKey.trim() !== ""
+      ? secretKey.trim()
+      : `FRAGX-${name.toUpperCase().replace(/\s+/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const accessKeyHash = cryptoNative(keyToUse);
 
   try {
     return await (prisma.player as any).create({
       data: {
         name,
-        avatarUrl: avatarUrl || defaultAvatar,
+        avatarUrl: defaultAvatar,
         role: role || "PLAYER",
+        accessKeyHash,
       },
       select: {
         id: true,
@@ -125,6 +137,7 @@ export async function createPlayer(name: string, avatarUrl?: string, role?: Play
     throw err;
   }
 }
+
 
 export async function updatePlayer(
   id: string,
