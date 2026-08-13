@@ -34,50 +34,34 @@ export default function MatchFormClient({
   const [playerId, setPlayerId] = useState(initialPlayers[0]?.id || "");
   const [kills, setKills] = useState<number | "">(0);
   const [placement, setPlacement] = useState<number | "">(1);
+
+  // Screenshot HTTPS URL input & preview state
   const [screenshotUrl, setScreenshotUrl] = useState("");
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [imageLoadError, setImageLoadError] = useState(false);
 
   const [players, setPlayers] = useState<PlayerOption[]>(initialPlayers);
   const [newPlayerName, setNewPlayerName] = useState("");
   const [isAddingPlayer, setIsAddingPlayer] = useState(false);
 
-  const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Handle file selection and upload
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Client preview
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-    setIsUploading(true);
-    setErrorMsg("");
-
-    const formData = new FormData();
-    formData.append("file", file);
-
+  // Helper for URL validation
+  const isValidHttpsUrl = (url: string) => {
+    if (!url) return false;
     try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.error || "Image upload failed");
-        setPreviewUrl("");
-      } else {
-        setScreenshotUrl(data.url);
-      }
-    } catch (err) {
-      setErrorMsg("Network error during image upload.");
-      setPreviewUrl("");
-    } finally {
-      setIsUploading(false);
+      const parsed = new URL(url);
+      return parsed.protocol === "https:";
+    } catch {
+      return false;
     }
+  };
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setScreenshotUrl(val);
+    setImageLoadError(false);
+    setErrorMsg("");
   };
 
   // Add new player on the fly
@@ -108,8 +92,21 @@ export default function MatchFormClient({
   // Handle match form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!screenshotUrl) {
-      setErrorMsg("Please upload an end screen screenshot proof.");
+
+    const trimmedUrl = screenshotUrl.trim();
+
+    if (!trimmedUrl) {
+      setErrorMsg("Please paste a screenshot URL.");
+      return;
+    }
+
+    if (!isValidHttpsUrl(trimmedUrl)) {
+      setErrorMsg("Please enter a valid HTTPS screenshot URL (e.g. https://example.com/screenshot.jpg).");
+      return;
+    }
+
+    if (trimmedUrl.length > 2048) {
+      setErrorMsg("Screenshot URL is too long (maximum 2048 characters).");
       return;
     }
 
@@ -131,7 +128,7 @@ export default function MatchFormClient({
           playerId,
           kills: Number(kills),
           placement: Number(placement),
-          screenshotUrl,
+          screenshotUrl: trimmedUrl,
         }),
       });
 
@@ -149,55 +146,65 @@ export default function MatchFormClient({
     }
   };
 
+  const isUrlValid = isValidHttpsUrl(screenshotUrl.trim());
+
   return (
     <main className="flex-1 w-full max-w-md mx-auto px-safe-margin pt-20 pb-stack-lg flex flex-col gap-stack-lg">
       <div className="space-y-2 text-center mb-2">
         <h2 className="font-headline text-headline-md text-on-surface">Log Match Data</h2>
         <p className="font-body text-body-md text-on-surface-variant">
-          Enter post-match stats to track squad performance.
+          Enter post-match stats and screenshot URL to track squad performance.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-stack-md">
-        {/* Screenshot Upload Area */}
-        <div className="w-full">
-          <label className="block font-label-caps text-label-caps text-on-surface-variant mb-stack-sm uppercase">
-            End Screen Proof
+        {/* Screenshot URL Input Area */}
+        <div className="flex flex-col gap-base">
+          <label className="font-label-caps text-label-caps text-on-surface-variant uppercase" htmlFor="screenshot-url">
+            SCREENSHOT URL
           </label>
-          <div className="relative w-full h-48 bg-surface-container rounded-xl border border-dashed border-outline-variant/40 flex flex-col items-center justify-center cursor-pointer hover:bg-surface-container-high transition-colors overflow-hidden group">
-            {previewUrl || screenshotUrl ? (
-              <div className="absolute inset-0 w-full h-full">
-                <img
-                  src={previewUrl || screenshotUrl}
-                  alt="Proof preview"
-                  className="w-full h-full object-cover"
-                />
-                {isUploading && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-primary font-label-caps text-label-caps">
-                    UPLOADING...
+          <input
+            id="screenshot-url"
+            type="url"
+            value={screenshotUrl}
+            onChange={handleUrlChange}
+            placeholder="https://example.com/bgmi-match-screenshot.jpg"
+            required
+            maxLength={2048}
+            className="w-full bg-surface-container border border-surface-container-high rounded-lg px-4 py-3 font-label-caps text-label-caps text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary transition-colors"
+          />
+          <span className="font-body text-xs text-on-surface-variant/70">
+            Paste the public HTTPS URL of the BGMI match screenshot.
+          </span>
+
+          {/* Instant Image Preview Area */}
+          {screenshotUrl.trim() !== "" && (
+            <div className="mt-2 space-y-1">
+              <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">
+                IMAGE PREVIEW
+              </span>
+              <div className="relative w-full h-48 bg-surface-container rounded-xl border border-surface-container-high overflow-hidden flex items-center justify-center">
+                {!isUrlValid ? (
+                  <div className="text-center p-4 text-error font-body text-xs">
+                    <span className="material-symbols-outlined text-2xl mb-1 block">link_off</span>
+                    URL must start with https://
                   </div>
+                ) : imageLoadError ? (
+                  <div className="text-center p-4 text-error font-body text-xs">
+                    <span className="material-symbols-outlined text-2xl mb-1 block">broken_image</span>
+                    Unable to load remote image. Please check the URL.
+                  </div>
+                ) : (
+                  <img
+                    src={screenshotUrl.trim()}
+                    alt="Match screenshot preview"
+                    onError={() => setImageLoadError(true)}
+                    className="w-full h-full object-cover rounded-xl"
+                  />
                 )}
               </div>
-            ) : (
-              <div className="z-20 flex flex-col items-center text-on-surface-variant group-hover:text-primary transition-colors text-center p-4">
-                <span className="material-symbols-outlined mb-2 text-[32px]">
-                  add_photo_alternate
-                </span>
-                <span className="font-body text-body-md">
-                  {isUploading ? "Uploading..." : "Tap to upload screenshot"}
-                </span>
-                <span className="font-label-caps text-label-caps text-on-surface-variant/60 mt-1">
-                  JPEG, PNG, WebP up to 5MB
-                </span>
-              </div>
-            )}
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleFileChange}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30"
-            />
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Session & Match Number Row */}
@@ -334,7 +341,7 @@ export default function MatchFormClient({
         <div className="flex flex-col gap-stack-sm mt-stack-md pt-stack-md border-t border-surface-container-high">
           <button
             type="submit"
-            disabled={isSubmitting || isUploading}
+            disabled={isSubmitting}
             className="w-full bg-primary text-[#3a0b00] font-label-caps text-label-caps py-4 rounded-xl primary-glow hover:bg-primary-fixed-dim active:scale-[0.98] transition-all uppercase tracking-widest font-bold disabled:opacity-50"
           >
             {isSubmitting ? "SAVING MATCH..." : "SAVE MATCH"}

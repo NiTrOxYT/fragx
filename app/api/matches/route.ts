@@ -9,7 +9,14 @@ const createMatchSchema = z.object({
   playerId: z.string().min(1, "Player selection is required"),
   kills: z.number().int().min(0, "Kills must be 0 or greater"),
   placement: z.number().int().min(1, "Placement must be 1 or greater"),
-  screenshotUrl: z.string().min(1, "Screenshot proof is required"),
+  screenshotUrl: z
+    .string()
+    .min(1, "Screenshot URL is required")
+    .max(2048, "URL exceeds maximum length of 2048 characters")
+    .url("Must be a valid URL")
+    .refine((url) => url.startsWith("https://"), {
+      message: "Screenshot URL must use HTTPS (https://)",
+    }),
   duration: z.string().optional(),
 });
 

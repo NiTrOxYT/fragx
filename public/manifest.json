@@ -9,13 +9,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/uploads/rohan.svg",
+      "src": "https://api.dicebear.com/7.x/bottts/svg?seed=FRAGX",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "/uploads/rohan.svg",
+      "src": "https://api.dicebear.com/7.x/bottts/svg?seed=FRAGX",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"

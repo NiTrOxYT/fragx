@@ -22,7 +22,7 @@ export default async function AdminDashboardPage() {
         totalMatches: summary.matchCount,
         totalKills: summary.totalKills,
         mvpName: currentMvp?.name || "None",
-        mvpAvatar: currentMvp?.avatarUrl || "/uploads/rohan.svg",
+        mvpAvatar: currentMvp?.avatarUrl || "https://api.dicebear.com/7.x/bottts/svg?seed=Rohan",
         mvpKills: currentMvp?.totalKills || 0,
       }}
     />

@@ -1,58 +1,26 @@
 import { PrismaClient } from "@prisma/client";
-import fs from "fs";
-import path from "path";
 
 const prisma = new PrismaClient();
 
-// Helper to create localized SVG placeholder images if needed
-function ensureLocalPlaceholderImages() {
-  const uploadsDir = path.join(process.cwd(), "public", "uploads");
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
+// Public HTTPS avatar & match screenshot URLs for seeding
+const AVATARS = {
+  rohan: "https://api.dicebear.com/7.x/bottts/svg?seed=Rohan&backgroundColor=171717",
+  arjun: "https://api.dicebear.com/7.x/bottts/svg?seed=Arjun&backgroundColor=171717",
+  sourik: "https://api.dicebear.com/7.x/bottts/svg?seed=Sourik&backgroundColor=171717",
+  kunal: "https://api.dicebear.com/7.x/bottts/svg?seed=Kunal&backgroundColor=171717",
+  knox: "https://api.dicebear.com/7.x/bottts/svg?seed=Knox&backgroundColor=171717",
+};
 
-  const avatars = [
-    { name: "rohan.svg", color: "#FFB59E", text: "R" },
-    { name: "arjun.svg", color: "#E9C349", text: "A" },
-    { name: "sourik.svg", color: "#2492FF", text: "S" },
-    { name: "kunal.svg", color: "#FF571A", text: "K" },
-    { name: "knox.svg", color: "#A5C8FF", text: "X" },
-  ];
-
-  for (const av of avatars) {
-    const filePath = path.join(uploadsDir, av.name);
-    if (!fs.existsSync(filePath)) {
-      const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
-        <rect width="200" height="200" rx="100" fill="#171717"/>
-        <circle cx="100" cy="100" r="90" fill="none" stroke="${av.color}" stroke-width="4"/>
-        <text x="100" y="125" font-family="Sora, sans-serif" font-size="72" font-weight="bold" fill="${av.color}" text-anchor="middle">${av.text}</text>
-      </svg>`;
-      fs.writeFileSync(filePath, svgContent);
-    }
-  }
-
-  const matchScreenshots = ["match1.svg", "match2.svg", "match3.svg", "match4.svg", "match5.svg"];
-  for (let i = 0; i < matchScreenshots.length; i++) {
-    const filename = matchScreenshots[i];
-    const filePath = path.join(uploadsDir, filename);
-    if (!fs.existsSync(filePath)) {
-      const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
-        <rect width="1280" height="720" fill="#0A0A0A"/>
-        <rect x="20" y="20" width="1240" height="680" rx="16" fill="#131313" stroke="#262626" stroke-width="2"/>
-        <text x="640" y="320" font-family="Sora, sans-serif" font-size="48" font-weight="bold" fill="#FFB59E" text-anchor="middle">BGMI MATCH #${i + 1} PROOF</text>
-        <text x="640" y="400" font-family="JetBrains Mono, monospace" font-size="24" fill="#AD897E" text-anchor="middle">VICTORY HUMAN SQUAD - SECTOR 7G</text>
-        <circle cx="640" cy="500" r="40" fill="#FF4D00" opacity="0.3"/>
-        <text x="640" y="510" font-family="Sora, sans-serif" font-size="32" font-weight="bold" fill="#E5E2E1" text-anchor="middle">FRAGX</text>
-      </svg>`;
-      fs.writeFileSync(filePath, svgContent);
-    }
-  }
-}
+const SCREENSHOTS = [
+  "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80",
+];
 
 async function main() {
-  ensureLocalPlaceholderImages();
-
-  console.log("Seeding database...");
+  console.log("Seeding PostgreSQL database...");
 
   // Clean existing data
   await prisma.match.deleteMany({});
@@ -63,35 +31,35 @@ async function main() {
   const rohan = await prisma.player.create({
     data: {
       name: "Rohan",
-      avatarUrl: "/uploads/rohan.svg",
+      avatarUrl: AVATARS.rohan,
     },
   });
 
   const arjun = await prisma.player.create({
     data: {
       name: "Arjun",
-      avatarUrl: "/uploads/arjun.svg",
+      avatarUrl: AVATARS.arjun,
     },
   });
 
   const sourik = await prisma.player.create({
     data: {
       name: "Sourik",
-      avatarUrl: "/uploads/sourik.svg",
+      avatarUrl: AVATARS.sourik,
     },
   });
 
   const kunal = await prisma.player.create({
     data: {
       name: "Kunal",
-      avatarUrl: "/uploads/kunal.svg",
+      avatarUrl: AVATARS.kunal,
     },
   });
 
   const knox = await prisma.player.create({
     data: {
       name: "Knox",
-      avatarUrl: "/uploads/knox.svg",
+      avatarUrl: AVATARS.knox,
     },
   });
 
@@ -115,7 +83,7 @@ async function main() {
         playerId: rohan.id,
         kills: 12,
         placement: 1,
-        screenshotUrl: "/uploads/match1.svg",
+        screenshotUrl: SCREENSHOTS[0],
         duration: "21:45 MIN",
       },
       {
@@ -124,7 +92,7 @@ async function main() {
         playerId: kunal.id,
         kills: 9,
         placement: 3,
-        screenshotUrl: "/uploads/match2.svg",
+        screenshotUrl: SCREENSHOTS[1],
         duration: "18:20 MIN",
       },
       {
@@ -133,7 +101,7 @@ async function main() {
         playerId: rohan.id,
         kills: 18,
         placement: 1,
-        screenshotUrl: "/uploads/match3.svg",
+        screenshotUrl: SCREENSHOTS[2],
         duration: "24:10 MIN",
       },
       {
@@ -142,7 +110,7 @@ async function main() {
         playerId: arjun.id,
         kills: 7,
         placement: 2,
-        screenshotUrl: "/uploads/match4.svg",
+        screenshotUrl: SCREENSHOTS[3],
         duration: "19:05 MIN",
       },
       {
@@ -151,7 +119,7 @@ async function main() {
         playerId: sourik.id,
         kills: 14,
         placement: 1,
-        screenshotUrl: "/uploads/match5.svg",
+        screenshotUrl: SCREENSHOTS[4],
         duration: "22:30 MIN",
       },
       {
@@ -160,7 +128,7 @@ async function main() {
         playerId: knox.id,
         kills: 0,
         placement: 15,
-        screenshotUrl: "/uploads/match1.svg",
+        screenshotUrl: SCREENSHOTS[0],
         duration: "04:12 MIN",
       },
     ],
@@ -184,7 +152,7 @@ async function main() {
         playerId: kunal.id,
         kills: 15,
         placement: 1,
-        screenshotUrl: "/uploads/match2.svg",
+        screenshotUrl: SCREENSHOTS[1],
         duration: "20:00 MIN",
       },
       {
@@ -193,7 +161,7 @@ async function main() {
         playerId: arjun.id,
         kills: 15,
         placement: 1,
-        screenshotUrl: "/uploads/match3.svg",
+        screenshotUrl: SCREENSHOTS[2],
         duration: "22:15 MIN",
       },
       {
@@ -202,7 +170,7 @@ async function main() {
         playerId: sourik.id,
         kills: 6,
         placement: 4,
-        screenshotUrl: "/uploads/match4.svg",
+        screenshotUrl: SCREENSHOTS[3],
         duration: "14:40 MIN",
       },
       {
@@ -211,7 +179,7 @@ async function main() {
         playerId: knox.id,
         kills: 2,
         placement: 8,
-        screenshotUrl: "/uploads/match5.svg",
+        screenshotUrl: SCREENSHOTS[4],
         duration: "09:50 MIN",
       },
     ],
@@ -234,7 +202,7 @@ async function main() {
         playerId: sourik.id,
         kills: 11,
         placement: 1,
-        screenshotUrl: "/uploads/match1.svg",
+        screenshotUrl: SCREENSHOTS[0],
         duration: "21:00 MIN",
       },
       {
@@ -243,13 +211,13 @@ async function main() {
         playerId: rohan.id,
         kills: 13,
         placement: 2,
-        screenshotUrl: "/uploads/match2.svg",
+        screenshotUrl: SCREENSHOTS[1],
         duration: "19:45 MIN",
       },
     ],
   });
 
-  console.log("Seeding complete!");
+  console.log("PostgreSQL seeding complete!");
 }
 
 main()
