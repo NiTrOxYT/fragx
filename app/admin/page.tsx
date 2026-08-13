@@ -6,10 +6,12 @@ import AdminDashboardClient from "./AdminDashboardClient";
 export const revalidate = 0;
 
 export default async function AdminDashboardPage() {
-  const isAuthenticated = await verifyAdminAuth();
-  const activeDraft = await getOrCreateActiveDraftSession();
-  const summary = await getSessionSummary();
-  const mvpData = await getMVP();
+  const [isAuthenticated, activeDraft, summary, mvpData] = await Promise.all([
+    verifyAdminAuth(),
+    getOrCreateActiveDraftSession(),
+    getSessionSummary(),
+    getMVP(),
+  ]);
 
   const currentMvp = mvpData?.players[0];
 

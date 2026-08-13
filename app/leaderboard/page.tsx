@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getLeaderboard } from "@/lib/services/stats";
 
-export const revalidate = 0;
+export const revalidate = 60;
 
 interface LeaderboardPageProps {
   searchParams?: {

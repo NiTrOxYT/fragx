@@ -18,13 +18,15 @@ export default async function ReviewSessionPage({ params }: ReviewSessionPagePro
     redirect("/admin");
   }
 
-  const session = await getSessionById(params.id);
+  const [session, mvpData] = await Promise.all([
+    getSessionById(params.id),
+    getMVP(params.id),
+  ]);
 
   if (!session) {
     notFound();
   }
 
-  const mvpData = await getMVP(params.id);
   const mainMvp = mvpData?.players[0];
 
   const dateObj = new Date(session.date);

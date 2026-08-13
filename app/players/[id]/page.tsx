@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import PerformanceChart from "@/components/players/PerformanceChart";
 import Link from "next/link";
 
-export const revalidate = 0;
+export const revalidate = 60;
 
 interface PlayerProfilePageProps {
   params: {

@@ -3,12 +3,14 @@ import { getMVP, getSessionSummary, getRecentMatches } from "@/lib/services/stat
 import GoldenGunAward from "@/components/common/GoldenGunAward";
 import EmptyState from "@/components/common/EmptyState";
 
-export const revalidate = 0; // Dynamic server rendering for fresh data
+export const revalidate = 60; // 60-second ISR for fast public page delivery
 
 export default async function HomePage() {
-  const mvpData = await getMVP();
-  const summary = await getSessionSummary();
-  const recentMatches = await getRecentMatches(5);
+  const [mvpData, summary, recentMatches] = await Promise.all([
+    getMVP(),
+    getSessionSummary(),
+    getRecentMatches(5),
+  ]);
 
   const mainMvp = mvpData?.players[0];
 

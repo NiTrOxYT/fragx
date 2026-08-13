@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getGroupedMatchHistory } from "@/lib/services/matches";
 import EmptyState from "@/components/common/EmptyState";
 
-export const revalidate = 0;
+export const revalidate = 60;
 
 interface MatchHistoryPageProps {
   searchParams?: {

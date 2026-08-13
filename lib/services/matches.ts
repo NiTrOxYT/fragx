@@ -3,9 +3,28 @@ import { prisma } from "@/lib/db";
 export async function getMatchById(id: string) {
   return await prisma.match.findUnique({
     where: { id },
-    include: {
-      player: true,
-      session: true,
+    select: {
+      id: true,
+      matchNumber: true,
+      placement: true,
+      kills: true,
+      screenshotUrl: true,
+      duration: true,
+      createdAt: true,
+      player: {
+        select: {
+          id: true,
+          name: true,
+          avatarUrl: true,
+        },
+      },
+      session: {
+        select: {
+          id: true,
+          date: true,
+          status: true,
+        },
+      },
     },
   });
 }
@@ -17,9 +36,24 @@ export async function getGroupedMatchHistory() {
         status: "PUBLISHED",
       },
     },
-    include: {
-      player: true,
-      session: true,
+    select: {
+      id: true,
+      matchNumber: true,
+      placement: true,
+      kills: true,
+      duration: true,
+      createdAt: true,
+      player: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      session: {
+        select: {
+          date: true,
+        },
+      },
     },
     orderBy: [
       { session: { date: "desc" } },
@@ -60,35 +94,39 @@ export async function createMatch(data: {
   screenshotUrl: string;
   duration?: string;
 }) {
-  // Check for duplicate match number in the same session
-  const existing = await prisma.match.findUnique({
-    where: {
-      sessionId_matchNumber: {
+  try {
+    return await prisma.match.create({
+      data: {
         sessionId: data.sessionId,
         matchNumber: data.matchNumber,
+        playerId: data.playerId,
+        kills: data.kills,
+        placement: data.placement,
+        screenshotUrl: data.screenshotUrl,
+        duration: data.duration || "20:00 MIN",
       },
-    },
-  });
-
-  if (existing) {
-    throw new Error(`Match #${data.matchNumber} already exists in this session.`);
+      select: {
+        id: true,
+        matchNumber: true,
+        playerId: true,
+        kills: true,
+        placement: true,
+        screenshotUrl: true,
+        duration: true,
+        player: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+        session: {
+          select: { id: true, date: true, status: true },
+        },
+      },
+    });
+  } catch (err: any) {
+    if (err?.code === "P2002") {
+      throw new Error(`Match #${data.matchNumber} already exists in this session.`);
+    }
+    throw err;
   }
-
-  return await prisma.match.create({
-    data: {
-      sessionId: data.sessionId,
-      matchNumber: data.matchNumber,
-      playerId: data.playerId,
-      kills: data.kills,
-      placement: data.placement,
-      screenshotUrl: data.screenshotUrl,
-      duration: data.duration || "20:00 MIN",
-    },
-    include: {
-      player: true,
-      session: true,
-    },
-  });
 }
 
 export async function deleteMatch(id: string) {
@@ -96,3 +134,4 @@ export async function deleteMatch(id: string) {
     where: { id },
   });
 }
+

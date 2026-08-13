@@ -12,13 +12,12 @@ const createMatchSchema = z.object({
   screenshotUrl: z
     .string()
     .min(1, "Screenshot URL is required")
-    .max(2048, "URL exceeds maximum length of 2048 characters")
-    .url("Must be a valid URL")
-    .refine((url) => url.startsWith("https://"), {
-      message: "Screenshot URL must use HTTPS (https://)",
+    .refine((url) => url.startsWith("https://") || url.startsWith("data:image/"), {
+      message: "Screenshot URL must use HTTPS (https://) or an uploaded image.",
     }),
   duration: z.string().optional(),
 });
+
 
 export async function POST(request: Request) {
   const isAuth = await verifyAdminAuth();

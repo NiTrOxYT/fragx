@@ -12,9 +12,11 @@ export default async function AddMatchPage() {
     redirect("/admin");
   }
 
-  const activeDraft = await getOrCreateActiveDraftSession();
-  const sessions = await getAllSessions();
-  const players = await getAllPlayers();
+  const [activeDraft, sessions, players] = await Promise.all([
+    getOrCreateActiveDraftSession(),
+    getAllSessions(),
+    getAllPlayers(),
+  ]);
 
   // Next match number in current draft session
   const nextMatchNum = activeDraft.matches.length + 1;

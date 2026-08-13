@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getAllPlayers } from "@/lib/services/players";
 import { getLeaderboard } from "@/lib/services/stats";
 
-export const revalidate = 0;
+export const revalidate = 60;
 
 export default async function PlayersPage() {
   const leaderboard = await getLeaderboard("ALL TIME");

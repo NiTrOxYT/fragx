@@ -35,7 +35,8 @@ export default function MatchFormClient({
   const [kills, setKills] = useState<number | "">(0);
   const [placement, setPlacement] = useState<number | "">(1);
 
-  // Screenshot HTTPS URL input & preview state
+  // Screenshot mode: "URL" or "UPLOAD"
+  const [imageMode, setImageMode] = useState<"URL" | "UPLOAD">("URL");
   const [screenshotUrl, setScreenshotUrl] = useState("");
   const [imageLoadError, setImageLoadError] = useState(false);
 
@@ -46,9 +47,10 @@ export default function MatchFormClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Helper for URL validation
+  // Helper for URL validation (HTTPS or Data URL)
   const isValidHttpsUrl = (url: string) => {
     if (!url) return false;
+    if (url.startsWith("data:image/")) return true;
     try {
       const parsed = new URL(url);
       return parsed.protocol === "https:";
@@ -63,6 +65,28 @@ export default function MatchFormClient({
     setImageLoadError(false);
     setErrorMsg("");
   };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMsg("Please select a valid image file.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        setScreenshotUrl(result);
+        setImageLoadError(false);
+        setErrorMsg("");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
 
   // Add new player on the fly
   const handleCreatePlayer = async () => {
@@ -158,24 +182,67 @@ export default function MatchFormClient({
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-stack-md">
-        {/* Screenshot URL Input Area */}
+        {/* Screenshot Input Area with Tab Switcher */}
         <div className="flex flex-col gap-base">
-          <label className="font-label-caps text-label-caps text-on-surface-variant uppercase" htmlFor="screenshot-url">
-            SCREENSHOT URL
-          </label>
-          <input
-            id="screenshot-url"
-            type="url"
-            value={screenshotUrl}
-            onChange={handleUrlChange}
-            placeholder="https://example.com/bgmi-match-screenshot.jpg"
-            required
-            maxLength={2048}
-            className="w-full bg-surface-container border border-surface-container-high rounded-lg px-4 py-3 font-label-caps text-label-caps text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary transition-colors"
-          />
-          <span className="font-body text-xs text-on-surface-variant/70">
-            Paste the public HTTPS URL of the BGMI match screenshot.
-          </span>
+          <div className="flex justify-between items-center">
+            <label className="font-label-caps text-label-caps text-on-surface-variant uppercase" htmlFor="screenshot-url">
+              MATCH SCREENSHOT
+            </label>
+            <div className="flex bg-surface-container p-0.5 rounded-lg border border-surface-container-high text-xs">
+              <button
+                type="button"
+                onClick={() => setImageMode("URL")}
+                className={`px-3 py-1 rounded font-label-caps transition-colors ${
+                  imageMode === "URL"
+                    ? "bg-primary text-on-primary font-semibold"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                Paste URL
+              </button>
+              <button
+                type="button"
+                onClick={() => setImageMode("UPLOAD")}
+                className={`px-3 py-1 rounded font-label-caps transition-colors ${
+                  imageMode === "UPLOAD"
+                    ? "bg-primary text-on-primary font-semibold"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                Upload File
+              </button>
+            </div>
+          </div>
+
+          {imageMode === "URL" ? (
+            <>
+              <input
+                id="screenshot-url"
+                type="url"
+                value={screenshotUrl.startsWith("data:") ? "" : screenshotUrl}
+                onChange={handleUrlChange}
+                placeholder="https://example.com/bgmi-match-screenshot.jpg"
+                required={!screenshotUrl}
+                maxLength={2048}
+                className="w-full bg-surface-container border border-surface-container-high rounded-lg px-4 py-3 font-label-caps text-label-caps text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary transition-colors"
+              />
+              <span className="font-body text-xs text-on-surface-variant/70">
+                Paste the public HTTPS URL of the BGMI match screenshot.
+              </span>
+            </>
+          ) : (
+            <>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="w-full bg-surface-container border border-surface-container-high rounded-lg px-4 py-2.5 font-label-caps text-label-caps text-on-surface file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-label-caps file:bg-primary file:text-on-primary hover:file:opacity-90 transition-colors"
+              />
+              <span className="font-body text-xs text-on-surface-variant/70">
+                Select an image file from your device.
+              </span>
+            </>
+          )}
 
           {/* Instant Image Preview Area */}
           {screenshotUrl.trim() !== "" && (
@@ -206,6 +273,7 @@ export default function MatchFormClient({
             </div>
           )}
         </div>
+
 
         {/* Session & Match Number Row */}
         <div className="grid grid-cols-2 gap-gutter">

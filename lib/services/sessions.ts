@@ -3,10 +3,22 @@ import { prisma } from "@/lib/db";
 export async function getSessionById(id: string) {
   return await prisma.gamingSession.findUnique({
     where: { id },
-    include: {
+    select: {
+      id: true,
+      date: true,
+      status: true,
+      publishedAt: true,
       matches: {
-        include: {
-          player: true,
+        select: {
+          id: true,
+          matchNumber: true,
+          kills: true,
+          placement: true,
+          screenshotUrl: true,
+          duration: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
         },
         orderBy: { matchNumber: "asc" },
       },
@@ -17,7 +29,11 @@ export async function getSessionById(id: string) {
 export async function getAllSessions() {
   return await prisma.gamingSession.findMany({
     orderBy: { date: "desc" },
-    include: {
+    select: {
+      id: true,
+      date: true,
+      status: true,
+      publishedAt: true,
       _count: {
         select: { matches: true },
       },
@@ -31,6 +47,11 @@ export async function createSession(date?: Date) {
       date: date || new Date(),
       status: "DRAFT",
     },
+    select: {
+      id: true,
+      date: true,
+      status: true,
+    },
   });
 }
 
@@ -38,9 +59,20 @@ export async function getOrCreateActiveDraftSession() {
   const existingDraft = await prisma.gamingSession.findFirst({
     where: { status: "DRAFT" },
     orderBy: { createdAt: "desc" },
-    include: {
+    select: {
+      id: true,
+      date: true,
+      status: true,
       matches: {
-        include: { player: true },
+        select: {
+          id: true,
+          matchNumber: true,
+          kills: true,
+          placement: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+        },
         orderBy: { matchNumber: "asc" },
       },
     },
@@ -55,9 +87,20 @@ export async function getOrCreateActiveDraftSession() {
       date: new Date(),
       status: "DRAFT",
     },
-    include: {
+    select: {
+      id: true,
+      date: true,
+      status: true,
       matches: {
-        include: { player: true },
+        select: {
+          id: true,
+          matchNumber: true,
+          kills: true,
+          placement: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+        },
         orderBy: { matchNumber: "asc" },
       },
     },
@@ -65,33 +108,37 @@ export async function getOrCreateActiveDraftSession() {
 }
 
 export async function publishSession(id: string) {
-  return await prisma.$transaction(async (tx) => {
-    const session = await tx.gamingSession.findUnique({
-      where: { id },
-      include: { matches: true },
-    });
-
-    if (!session) {
-      throw new Error("Session not found");
-    }
-
-    if (session.matches.length === 0) {
-      throw new Error("Cannot publish an empty session without matches.");
-    }
-
-    const updated = await tx.gamingSession.update({
-      where: { id },
-      data: {
-        status: "PUBLISHED",
-        publishedAt: new Date(),
+  const session = await prisma.gamingSession.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      status: true,
+      _count: {
+        select: { matches: true },
       },
-      include: {
-        matches: {
-          include: { player: true },
-        },
-      },
-    });
+    },
+  });
 
-    return updated;
+  if (!session) {
+    throw new Error("Session not found");
+  }
+
+  if (session._count.matches === 0) {
+    throw new Error("Cannot publish an empty session without matches.");
+  }
+
+  return await prisma.gamingSession.update({
+    where: { id },
+    data: {
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+    },
+    select: {
+      id: true,
+      date: true,
+      status: true,
+      publishedAt: true,
+    },
   });
 }
+

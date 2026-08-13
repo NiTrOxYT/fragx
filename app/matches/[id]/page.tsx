@@ -2,7 +2,7 @@ import { getMatchById } from "@/lib/services/matches";
 import { notFound } from "next/navigation";
 import MatchDetailsClient from "./MatchDetailsClient";
 
-export const revalidate = 0;
+export const revalidate = 60;
 
 interface MatchDetailsPageProps {
   params: {

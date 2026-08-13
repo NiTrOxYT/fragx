@@ -19,10 +19,20 @@ export async function getLatestPublishedSession() {
   return await prisma.gamingSession.findFirst({
     where: { status: "PUBLISHED" },
     orderBy: { date: "desc" },
-    include: {
+    select: {
+      id: true,
+      date: true,
+      status: true,
       matches: {
-        include: {
-          player: true,
+        select: {
+          id: true,
+          matchNumber: true,
+          kills: true,
+          placement: true,
+          playerId: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
         },
         orderBy: { matchNumber: "asc" },
       },
@@ -35,9 +45,18 @@ export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
   if (sessionId) {
     session = await prisma.gamingSession.findUnique({
       where: { id: sessionId },
-      include: {
+      select: {
+        id: true,
         matches: {
-          include: { player: true },
+          select: {
+            id: true,
+            kills: true,
+            placement: true,
+            playerId: true,
+            player: {
+              select: { id: true, name: true, avatarUrl: true },
+            },
+          },
         },
       },
     });
@@ -131,7 +150,15 @@ export async function getSessionSummary(sessionId?: string) {
   if (sessionId) {
     session = await prisma.gamingSession.findUnique({
       where: { id: sessionId },
-      include: { matches: true },
+      select: {
+        id: true,
+        matches: {
+          select: {
+            kills: true,
+            placement: true,
+          },
+        },
+      },
     });
   } else {
     session = await getLatestPublishedSession();
@@ -166,9 +193,19 @@ export async function getRecentMatches(limit = 10) {
     },
     orderBy: { createdAt: "desc" },
     take: limit,
-    include: {
-      player: true,
-      session: true,
+    select: {
+      id: true,
+      matchNumber: true,
+      kills: true,
+      placement: true,
+      screenshotUrl: true,
+      createdAt: true,
+      player: {
+        select: { id: true, name: true, avatarUrl: true },
+      },
+      session: {
+        select: { id: true, date: true },
+      },
     },
   });
 
@@ -188,17 +225,32 @@ export async function getLeaderboard(filter: "ALL TIME" | "THIS MONTH" | "THIS W
     startDate.setHours(0, 0, 0, 0);
   }
 
-  const matches = await prisma.match.findMany({
+  const matchesPromise = prisma.match.findMany({
     where: {
       session: {
         status: "PUBLISHED",
         ...(startDate ? { date: { gte: startDate } } : {}),
       },
     },
-    include: {
-      player: true,
+    select: {
+      id: true,
+      playerId: true,
+      kills: true,
+      placement: true,
+      player: {
+        select: { id: true, name: true, avatarUrl: true },
+      },
     },
   });
+
+  const allPlayersPromise =
+    filter === "ALL TIME"
+      ? prisma.player.findMany({
+          select: { id: true, name: true, avatarUrl: true },
+        })
+      : Promise.resolve([]);
+
+  const [matches, allPlayers] = await Promise.all([matchesPromise, allPlayersPromise]);
 
   const playerMap = new Map<
     string,
@@ -234,7 +286,6 @@ export async function getLeaderboard(filter: "ALL TIME" | "THIS MONTH" | "THIS W
 
   // Also include players with 0 matches if filter is ALL TIME
   if (filter === "ALL TIME") {
-    const allPlayers = await prisma.player.findMany();
     for (const p of allPlayers) {
       if (!playerMap.has(p.id)) {
         playerMap.set(p.id, {
@@ -269,3 +320,4 @@ export async function getLeaderboard(filter: "ALL TIME" | "THIS MONTH" | "THIS W
     ...item,
   }));
 }
+

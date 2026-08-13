@@ -48,4 +48,5 @@ model Match {
   @@unique([sessionId, matchNumber])
   @@index([sessionId])
   @@index([playerId])
+  @@index([matchNumber])
 }
