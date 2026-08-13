@@ -1,11 +1,23 @@
 import { prisma } from "@/lib/db";
 
-export async function getAllPlayers() {
-  return await prisma.player.findMany({
+export type PlayerRole = "PLAYER" | "MODERATOR" | "ADMIN";
+
+export interface PlayerRecord {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  role: PlayerRole;
+  isActive: boolean;
+}
+
+export async function getAllPlayers(): Promise<PlayerRecord[]> {
+  return await (prisma.player as any).findMany({
     select: {
       id: true,
       name: true,
       avatarUrl: true,
+      role: true,
+      isActive: true,
     },
     orderBy: { name: "asc" },
   });
@@ -13,14 +25,16 @@ export async function getAllPlayers() {
 
 export async function getPlayerById(id: string) {
   const [player, matches] = await Promise.all([
-    prisma.player.findUnique({
+    (prisma.player as any).findUnique({
       where: { id },
       select: {
         id: true,
         name: true,
         avatarUrl: true,
+        role: true,
+        isActive: true,
       },
-    }),
+    }) as Promise<PlayerRecord | null>,
     prisma.match.findMany({
       where: {
         playerId: id,
@@ -76,29 +90,34 @@ export async function getPlayerById(id: string) {
   };
 }
 
-export async function createPlayer(name: string, avatarUrl?: string) {
+export async function createPlayer(name: string, avatarUrl?: string, role?: PlayerRole): Promise<PlayerRecord> {
   const defaultAvatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}`;
 
   try {
-    return await prisma.player.create({
+    return await (prisma.player as any).create({
       data: {
         name,
         avatarUrl: avatarUrl || defaultAvatar,
+        role: role || "PLAYER",
       },
       select: {
         id: true,
         name: true,
         avatarUrl: true,
+        role: true,
+        isActive: true,
       },
     });
   } catch (err: any) {
     if (err?.code === "P2002") {
-      const existing = await prisma.player.findUnique({
+      const existing = await (prisma.player as any).findUnique({
         where: { name },
         select: {
           id: true,
           name: true,
           avatarUrl: true,
+          role: true,
+          isActive: true,
         },
       });
       if (existing) return existing;
@@ -106,4 +125,36 @@ export async function createPlayer(name: string, avatarUrl?: string) {
     throw err;
   }
 }
+
+export async function updatePlayer(
+  id: string,
+  data: {
+    name?: string;
+    avatarUrl?: string;
+    role?: PlayerRole;
+    isActive?: boolean;
+  }
+): Promise<PlayerRecord> {
+  return await (prisma.player as any).update({
+    where: { id },
+    data,
+    select: {
+      id: true,
+      name: true,
+      avatarUrl: true,
+      role: true,
+      isActive: true,
+    },
+  });
+}
+
+export async function deletePlayer(id: string) {
+  return await prisma.player.delete({
+    where: { id },
+  });
+}
+
+
+
+
 
