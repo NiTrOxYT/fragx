@@ -202,13 +202,20 @@ export default function AdminDashboardClient({
             Current MVP
           </span>
           <div className="flex items-center gap-4 mt-auto pt-4">
-            <div className="w-12 h-12 rounded-full bg-surface-container border-2 border-gold overflow-hidden shadow-[0_0_10px_rgba(212,175,55,0.3)] flex-shrink-0">
-              <img
-                src={stats.mvpAvatar}
-                alt={stats.mvpName}
-                className="w-full h-full object-cover"
-              />
+            <div className="w-12 h-12 rounded-full bg-surface-container border-2 border-gold overflow-hidden shadow-[0_0_10px_rgba(212,175,55,0.3)] flex-shrink-0 flex items-center justify-center">
+              {stats.mvpAvatar ? (
+                <img
+                  src={stats.mvpAvatar}
+                  alt={stats.mvpName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="material-symbols-outlined text-gold text-2xl">
+                  workspace_premium
+                </span>
+              )}
             </div>
+
             <div>
               <span className="font-headline text-headline-md text-on-background block">
                 {stats.mvpName}

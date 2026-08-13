@@ -330,7 +330,7 @@ export default function MatchFormClient({
                 type="text"
                 value={newPlayerName}
                 onChange={(e) => setNewPlayerName(e.target.value)}
-                placeholder="Enter gamertag (e.g. Sourik)"
+                placeholder="Enter gamertag (e.g. PlayerOne)"
                 className="flex-1 bg-surface-container border border-surface-container-high rounded-lg px-4 py-2 font-label-caps text-label-caps text-on-surface focus:outline-none focus:border-primary"
               />
               <button

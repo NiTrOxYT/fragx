@@ -9,14 +9,24 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model Player {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  avatarUrl String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  matches   Match[]
+enum Role {
+  PLAYER
+  MODERATOR
+  ADMIN
 }
+
+model Player {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  avatarUrl     String
+  role          Role     @default(PLAYER)
+  accessKeyHash String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  matches       Match[]
+}
+
 
 model GamingSession {
   id          String    @id @default(cuid())

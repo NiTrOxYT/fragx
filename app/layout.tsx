@@ -3,6 +3,8 @@ import "./globals.css";
 import TopHeader from "@/components/layout/TopHeader";
 import MobileNav from "@/components/layout/MobileNav";
 import PwaRegister from "@/components/common/PwaRegister";
+import { verifyAccessAuth } from "@/lib/services/access";
+import AccessGateClient from "@/components/common/AccessGateClient";
 
 export const metadata: Metadata = {
   title: "FRAGX - Your Squad. Your Stats. Your Night.",
@@ -23,21 +25,28 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isAccessAuthorized = await verifyAccessAuth();
+
   return (
     <html lang="en" className="dark">
       <body className="bg-background text-on-background min-h-screen antialiased flex flex-col font-body selection:bg-primary-container selection:text-white">
         <PwaRegister />
-        <TopHeader />
-        <div className="flex-1 w-full flex flex-col">
-          {children}
-        </div>
-        <MobileNav />
+        {isAccessAuthorized ? (
+          <>
+            <TopHeader />
+            <div className="flex-1 w-full flex flex-col">{children}</div>
+            <MobileNav />
+          </>
+        ) : (
+          <AccessGateClient />
+        )}
       </body>
     </html>
   );
 }
+
