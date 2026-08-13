@@ -2,17 +2,19 @@ import { verifyAdminAuth } from "@/lib/services/admin";
 import { getLatestPublishedSession, getMVP, getSessionSummary } from "@/lib/services/stats";
 import { getOrCreateActiveDraftSession } from "@/lib/services/sessions";
 import { getAllPlayers } from "@/lib/services/players";
+import { getAllTeams } from "@/lib/services/teams";
 import AdminDashboardClient from "./AdminDashboardClient";
 
 export const revalidate = 0;
 
 export default async function AdminDashboardPage() {
-  const [isAuthenticated, activeDraft, summary, mvpData, players] = await Promise.all([
+  const [isAuthenticated, activeDraft, summary, mvpData, players, teams] = await Promise.all([
     verifyAdminAuth(),
     getOrCreateActiveDraftSession(),
     getSessionSummary(),
     getMVP(),
     getAllPlayers(),
+    getAllTeams(),
   ]);
 
   const currentMvp = mvpData?.players[0];
@@ -29,6 +31,12 @@ export default async function AdminDashboardPage() {
         role: (p.role || "PLAYER") as "PLAYER" | "MODERATOR" | "ADMIN",
         isActive: p.isActive !== false,
       }))}
+      initialTeams={teams.map((t) => ({
+        id: t.id,
+        name: t.name,
+        isActive: t.isActive,
+        playerCount: t.playerCount || 0,
+      }))}
       stats={{
         totalMatches: summary.matchCount,
         totalKills: summary.totalKills,
@@ -39,4 +47,5 @@ export default async function AdminDashboardPage() {
     />
   );
 }
+
 

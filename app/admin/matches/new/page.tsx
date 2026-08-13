@@ -1,6 +1,7 @@
 import { verifyAdminAuth } from "@/lib/services/admin";
 import { getOrCreateActiveDraftSession, getAllSessions } from "@/lib/services/sessions";
 import { getAllPlayers } from "@/lib/services/players";
+import { getActiveTeams } from "@/lib/services/teams";
 import { formatSessionDate } from "@/lib/utils/dates";
 import MatchFormClient from "./MatchFormClient";
 import { redirect } from "next/navigation";
@@ -13,10 +14,11 @@ export default async function AddMatchPage() {
     redirect("/admin");
   }
 
-  const [activeDraft, sessions, players] = await Promise.all([
+  const [activeDraft, sessions, players, teams] = await Promise.all([
     getOrCreateActiveDraftSession(),
     getAllSessions(),
     getAllPlayers(),
+    getActiveTeams(),
   ]);
 
   // Next match number in current draft session
@@ -35,7 +37,12 @@ export default async function AddMatchPage() {
         id: p.id,
         name: p.name,
       }))}
+      initialTeams={teams.map((t) => ({
+        id: t.id,
+        name: t.name,
+      }))}
     />
   );
 }
+
 

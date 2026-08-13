@@ -16,7 +16,7 @@ export interface MVPResult {
 }
 
 export async function getLatestPublishedSession() {
-  return await prisma.gamingSession.findFirst({
+  return await (prisma.gamingSession as any).findFirst({
     where: { status: "PUBLISHED" },
     orderBy: { date: "desc" },
     select: {
@@ -33,6 +33,23 @@ export async function getLatestPublishedSession() {
           player: {
             select: { id: true, name: true, avatarUrl: true },
           },
+          matchTeams: {
+            select: {
+              id: true,
+              placement: true,
+              team: {
+                select: { id: true, name: true },
+              },
+              players: {
+                select: {
+                  kills: true,
+                  player: {
+                    select: { id: true, name: true, avatarUrl: true },
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: { matchNumber: "asc" },
       },
@@ -43,7 +60,7 @@ export async function getLatestPublishedSession() {
 export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
   let session;
   if (sessionId) {
-    session = await prisma.gamingSession.findUnique({
+    session = await (prisma.gamingSession as any).findUnique({
       where: { id: sessionId },
       select: {
         id: true,
@@ -55,6 +72,23 @@ export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
             playerId: true,
             player: {
               select: { id: true, name: true, avatarUrl: true },
+            },
+            matchTeams: {
+              select: {
+                id: true,
+                placement: true,
+                team: {
+                  select: { id: true, name: true },
+                },
+                players: {
+                  select: {
+                    kills: true,
+                    player: {
+                      select: { id: true, name: true, avatarUrl: true },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -85,32 +119,68 @@ export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
   let goldenGunWinner: { name: string; kills: number } | null = null;
 
   for (const match of session.matches) {
-    const pId = match.playerId;
-    const existing = playerStatsMap.get(pId) || {
-      id: pId,
-      name: match.player.name,
-      avatarUrl: match.player.avatarUrl,
-      totalKills: 0,
-      bestPlacement: 999,
-      peakKills: 0,
-    };
+    if (match.matchTeams && match.matchTeams.length > 0) {
+      // Multi-team match structure
+      for (const mt of match.matchTeams) {
+        for (const mp of mt.players) {
+          const pId = mp.player.id;
+          const existing = playerStatsMap.get(pId) || {
+            id: pId,
+            name: mp.player.name,
+            avatarUrl: mp.player.avatarUrl,
+            totalKills: 0,
+            bestPlacement: 999,
+            peakKills: 0,
+          };
 
-    existing.totalKills += match.kills;
-    if (match.placement < existing.bestPlacement) {
-      existing.bestPlacement = match.placement;
-    }
-    if (match.kills > existing.peakKills) {
-      existing.peakKills = match.kills;
-    }
+          existing.totalKills += mp.kills;
+          if (mt.placement < existing.bestPlacement) {
+            existing.bestPlacement = mt.placement;
+          }
+          if (mp.kills > existing.peakKills) {
+            existing.peakKills = mp.kills;
+          }
 
-    playerStatsMap.set(pId, existing);
+          playerStatsMap.set(pId, existing);
 
-    if (match.kills > maxSingleMatchKills) {
-      maxSingleMatchKills = match.kills;
-      goldenGunWinner = {
+          if (mp.kills > maxSingleMatchKills) {
+            maxSingleMatchKills = mp.kills;
+            goldenGunWinner = {
+              name: mp.player.name,
+              kills: mp.kills,
+            };
+          }
+        }
+      }
+    } else if (match.playerId && match.player) {
+      // Legacy single-player match structure
+      const pId = match.playerId;
+      const existing = playerStatsMap.get(pId) || {
+        id: pId,
         name: match.player.name,
-        kills: match.kills,
+        avatarUrl: match.player.avatarUrl,
+        totalKills: 0,
+        bestPlacement: 999,
+        peakKills: 0,
       };
+
+      existing.totalKills += match.kills || 0;
+      if ((match.placement || 999) < existing.bestPlacement) {
+        existing.bestPlacement = match.placement;
+      }
+      if ((match.kills || 0) > existing.peakKills) {
+        existing.peakKills = match.kills;
+      }
+
+      playerStatsMap.set(pId, existing);
+
+      if ((match.kills || 0) > maxSingleMatchKills) {
+        maxSingleMatchKills = match.kills;
+        goldenGunWinner = {
+          name: match.player.name,
+          kills: match.kills,
+        };
+      }
     }
   }
 
@@ -148,7 +218,7 @@ export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
 export async function getSessionSummary(sessionId?: string) {
   let session;
   if (sessionId) {
-    session = await prisma.gamingSession.findUnique({
+    session = await (prisma.gamingSession as any).findUnique({
       where: { id: sessionId },
       select: {
         id: true,
@@ -156,6 +226,14 @@ export async function getSessionSummary(sessionId?: string) {
           select: {
             kills: true,
             placement: true,
+            matchTeams: {
+              select: {
+                placement: true,
+                players: {
+                  select: { kills: true },
+                },
+              },
+            },
           },
         },
       },
@@ -173,9 +251,24 @@ export async function getSessionSummary(sessionId?: string) {
   }
 
   const matchCount = session.matches.length;
-  const totalKills = session.matches.reduce((acc, m) => acc + m.kills, 0);
-  const wins = session.matches.filter((m) => m.placement === 1).length;
-  const winRate = Math.round((wins / matchCount) * 100);
+  let totalKills = 0;
+  let wins = 0;
+
+  for (const match of session.matches) {
+    if (match.matchTeams && match.matchTeams.length > 0) {
+      for (const mt of match.matchTeams) {
+        if (mt.placement === 1) wins += 1;
+        for (const mp of mt.players) {
+          totalKills += mp.kills;
+        }
+      }
+    } else {
+      totalKills += match.kills || 0;
+      if (match.placement === 1) wins += 1;
+    }
+  }
+
+  const winRate = matchCount > 0 ? Math.round((wins / matchCount) * 100) : 0;
 
   return {
     matchCount,
@@ -185,7 +278,7 @@ export async function getSessionSummary(sessionId?: string) {
 }
 
 export async function getRecentMatches(limit = 10) {
-  const matches = await prisma.match.findMany({
+  const matches = await (prisma.match as any).findMany({
     where: {
       session: {
         status: "PUBLISHED",
@@ -206,6 +299,25 @@ export async function getRecentMatches(limit = 10) {
       session: {
         select: { id: true, date: true },
       },
+      matchTeams: {
+        select: {
+          id: true,
+          placement: true,
+          team: {
+            select: { id: true, name: true },
+          },
+          players: {
+            select: {
+              kills: true,
+              player: {
+                select: { id: true, name: true, avatarUrl: true },
+              },
+            },
+            orderBy: { kills: "desc" },
+          },
+        },
+        orderBy: { placement: "asc" },
+      },
     },
   });
 
@@ -220,12 +332,12 @@ export async function getLeaderboard(filter: "ALL TIME" | "THIS MONTH" | "THIS W
     startDate = new Date(now.getFullYear(), now.getMonth(), 1);
   } else if (filter === "THIS WEEK") {
     const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday start
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
     startDate = new Date(now.setDate(diff));
     startDate.setHours(0, 0, 0, 0);
   }
 
-  const matchesPromise = prisma.match.findMany({
+  const matchesPromise = (prisma.match as any).findMany({
     where: {
       session: {
         status: "PUBLISHED",
@@ -240,12 +352,26 @@ export async function getLeaderboard(filter: "ALL TIME" | "THIS MONTH" | "THIS W
       player: {
         select: { id: true, name: true, avatarUrl: true },
       },
+      matchTeams: {
+        select: {
+          placement: true,
+          players: {
+            select: {
+              playerId: true,
+              kills: true,
+              player: {
+                select: { id: true, name: true, avatarUrl: true },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
   const allPlayersPromise =
     filter === "ALL TIME"
-      ? prisma.player.findMany({
+      ? (prisma.player as any).findMany({
           select: { id: true, name: true, avatarUrl: true },
         })
       : Promise.resolve([]);
@@ -265,23 +391,49 @@ export async function getLeaderboard(filter: "ALL TIME" | "THIS MONTH" | "THIS W
   >();
 
   for (const match of matches) {
-    const pId = match.playerId;
-    const existing = playerMap.get(pId) || {
-      id: pId,
-      name: match.player.name,
-      avatarUrl: match.player.avatarUrl,
-      matchesCount: 0,
-      totalKills: 0,
-      wins: 0,
-    };
+    if (match.matchTeams && match.matchTeams.length > 0) {
+      // Multi-team match
+      for (const mt of match.matchTeams) {
+        for (const mp of mt.players) {
+          const pId = mp.playerId;
+          const existing = playerMap.get(pId) || {
+            id: pId,
+            name: mp.player.name,
+            avatarUrl: mp.player.avatarUrl,
+            matchesCount: 0,
+            totalKills: 0,
+            wins: 0,
+          };
 
-    existing.matchesCount += 1;
-    existing.totalKills += match.kills;
-    if (match.placement === 1) {
-      existing.wins += 1;
+          existing.matchesCount += 1;
+          existing.totalKills += mp.kills;
+          if (mt.placement === 1) {
+            existing.wins += 1;
+          }
+
+          playerMap.set(pId, existing);
+        }
+      }
+    } else if (match.playerId && match.player) {
+      // Legacy single-player match
+      const pId = match.playerId;
+      const existing = playerMap.get(pId) || {
+        id: pId,
+        name: match.player.name,
+        avatarUrl: match.player.avatarUrl,
+        matchesCount: 0,
+        totalKills: 0,
+        wins: 0,
+      };
+
+      existing.matchesCount += 1;
+      existing.totalKills += match.kills || 0;
+      if (match.placement === 1) {
+        existing.wins += 1;
+      }
+
+      playerMap.set(pId, existing);
     }
-
-    playerMap.set(pId, existing);
   }
 
   // Also include players with 0 matches if filter is ALL TIME
@@ -320,4 +472,3 @@ export async function getLeaderboard(filter: "ALL TIME" | "THIS MONTH" | "THIS W
     ...item,
   }));
 }
-

@@ -12,11 +12,19 @@ export interface AdminPlayer {
   isActive: boolean;
 }
 
+export interface AdminTeam {
+  id: string;
+  name: string;
+  isActive: boolean;
+  playerCount: number;
+}
+
 interface AdminDashboardClientProps {
   isAuthenticated: boolean;
   activeDraftId: string;
   draftMatchCount: number;
   initialPlayers: AdminPlayer[];
+  initialTeams: AdminTeam[];
   stats: {
     totalMatches: number;
     totalKills: number;
@@ -31,6 +39,7 @@ export default function AdminDashboardClient({
   activeDraftId,
   draftMatchCount,
   initialPlayers,
+  initialTeams,
   stats,
 }: AdminDashboardClientProps) {
   const [pin, setPin] = useState("");
@@ -38,8 +47,8 @@ export default function AdminDashboardClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
-  // Management section active tab: "MATCHES" | "PLAYERS"
-  const [activeTab, setActiveTab] = useState<"MATCHES" | "PLAYERS">("MATCHES");
+  // Management section active tab: "MATCHES" | "PLAYERS" | "TEAMS"
+  const [activeTab, setActiveTab] = useState<"MATCHES" | "PLAYERS" | "TEAMS">("MATCHES");
 
   // Player management state
   const [players, setPlayers] = useState<AdminPlayer[]>(initialPlayers);
@@ -49,6 +58,13 @@ export default function AdminDashboardClient({
   const [newPlayerSecretKey, setNewPlayerSecretKey] = useState("");
   const [playerActionMsg, setPlayerActionMsg] = useState("");
   const [loadingPlayerId, setLoadingPlayerId] = useState<string | null>(null);
+
+  // Team management state
+  const [teams, setTeams] = useState<AdminTeam[]>(initialTeams);
+  const [showAddTeam, setShowAddTeam] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [teamActionMsg, setTeamActionMsg] = useState("");
+  const [loadingTeamId, setLoadingTeamId] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +128,6 @@ export default function AdminDashboardClient({
     }
   };
 
-
   // Update player role or status
   const handleUpdatePlayer = async (
     id: string,
@@ -169,6 +184,87 @@ export default function AdminDashboardClient({
     }
   };
 
+  // Add new team
+  const handleAddTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newTeamName.trim();
+    if (!trimmed) return;
+
+    setTeamActionMsg("");
+    try {
+      const res = await fetch("/api/teams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.team) {
+        setTeams((prev) => [...prev, data.team]);
+        setNewTeamName("");
+        setShowAddTeam(false);
+        setTeamActionMsg("Team created successfully.");
+      } else {
+        setTeamActionMsg(data.error || "Failed to create team.");
+      }
+    } catch (err) {
+      setTeamActionMsg("Error creating team.");
+    }
+  };
+
+  // Update team active status
+  const handleUpdateTeam = async (id: string, updates: { name?: string; isActive?: boolean }) => {
+    setLoadingTeamId(id);
+    setTeamActionMsg("");
+
+    try {
+      const res = await fetch(`/api/teams/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.team) {
+        setTeams((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, ...data.team } : t))
+        );
+      } else {
+        setTeamActionMsg(data.error || "Failed to update team.");
+      }
+    } catch (err) {
+      setTeamActionMsg("Error updating team.");
+    } finally {
+      setLoadingTeamId(null);
+    }
+  };
+
+  // Delete team
+  const handleDeleteTeam = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+
+    setLoadingTeamId(id);
+    setTeamActionMsg("");
+
+    try {
+      const res = await fetch(`/api/teams/${id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setTeams((prev) => prev.filter((t) => t.id !== id));
+        setTeamActionMsg(`Team "${name}" deleted.`);
+      } else {
+        const data = await res.json();
+        setTeamActionMsg(data.error || "Failed to delete team.");
+      }
+    } catch (err) {
+      setTeamActionMsg("Error deleting team.");
+    } finally {
+      setLoadingTeamId(null);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <main className="flex-1 w-full max-w-md mx-auto px-safe-margin pt-24 pb-24 flex flex-col items-center justify-center">
@@ -179,7 +275,7 @@ export default function AdminDashboardClient({
             </div>
             <h2 className="font-headline text-headline-md text-on-surface">Admin Access</h2>
             <p className="font-body text-body-md text-on-surface-variant">
-              Enter your squad Admin PIN to manage matches, sessions, and players.
+              Enter your squad Admin PIN to manage matches, sessions, players, and teams.
             </p>
           </div>
 
@@ -219,7 +315,6 @@ export default function AdminDashboardClient({
 
   return (
     <main className="flex-1 w-full max-w-7xl mx-auto px-safe-margin pt-header-safe md:pt-24 pb-stack-lg flex flex-col gap-stack-lg">
-
       {/* Header Section */}
       <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -233,15 +328,15 @@ export default function AdminDashboardClient({
             </button>
           </div>
           <p className="font-body text-body-md text-on-surface-variant mt-1">
-            BGMI Squad Management: Matches, Sessions & Player Roles
+            BGMI Management: Matches, Squad Players & Teams
           </p>
         </div>
 
         {/* Section Navigation Tabs */}
-        <div className="flex bg-surface-container p-1 rounded-xl border border-surface-container-high w-full md:w-auto">
+        <div className="flex bg-surface-container p-1 rounded-xl border border-surface-container-high w-full md:w-auto overflow-x-auto">
           <button
             onClick={() => setActiveTab("MATCHES")}
-            className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg font-label-caps text-label-caps uppercase transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 md:flex-none px-5 py-2.5 rounded-lg font-label-caps text-label-caps uppercase transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
               activeTab === "MATCHES"
                 ? "bg-primary text-on-primary font-bold shadow-md"
                 : "text-on-surface-variant hover:text-on-surface"
@@ -253,7 +348,7 @@ export default function AdminDashboardClient({
 
           <button
             onClick={() => setActiveTab("PLAYERS")}
-            className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg font-label-caps text-label-caps uppercase transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 md:flex-none px-5 py-2.5 rounded-lg font-label-caps text-label-caps uppercase transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
               activeTab === "PLAYERS"
                 ? "bg-primary text-on-primary font-bold shadow-md"
                 : "text-on-surface-variant hover:text-on-surface"
@@ -261,6 +356,18 @@ export default function AdminDashboardClient({
           >
             <span className="material-symbols-outlined text-[18px]">group</span>
             PLAYERS ({players.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab("TEAMS")}
+            className={`flex-1 md:flex-none px-5 py-2.5 rounded-lg font-label-caps text-label-caps uppercase transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
+              activeTab === "TEAMS"
+                ? "bg-primary text-on-primary font-bold shadow-md"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">shield</span>
+            TEAMS ({teams.length})
           </button>
         </div>
       </section>
@@ -468,7 +575,6 @@ export default function AdminDashboardClient({
                   Create Player
                 </button>
               </div>
-
             </form>
           )}
 
@@ -568,6 +674,141 @@ export default function AdminDashboardClient({
             ) : (
               <div className="text-center py-10 text-on-surface-variant font-label-caps text-label-caps glass-panel rounded-xl">
                 NO PLAYERS REGISTERED YET. CLICK "+ ADD PLAYER" TO REGISTER SQUAD FRAGGERS.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 3: TEAMS MANAGEMENT */}
+      {activeTab === "TEAMS" && (
+        <div className="flex flex-col gap-stack-md">
+          {/* Header & Add Button */}
+          <div className="flex justify-between items-center bg-surface-container rounded-xl p-4 border border-surface-container-high">
+            <div>
+              <h3 className="font-headline text-headline-sm text-on-surface uppercase">
+                Squad Teams ({teams.length})
+              </h3>
+              <p className="font-body text-body-md text-on-surface-variant text-xs mt-0.5">
+                Manage teams that participate in multi-team BGMI matches.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowAddTeam(!showAddTeam)}
+              className="bg-primary text-on-primary font-label-caps text-label-caps px-4 py-2.5 rounded-lg flex items-center gap-1.5 uppercase hover:opacity-90 transition-opacity"
+            >
+              <span className="material-symbols-outlined text-sm">
+                {showAddTeam ? "close" : "add"}
+              </span>
+              {showAddTeam ? "Cancel" : "Add Team"}
+            </button>
+          </div>
+
+          {teamActionMsg && (
+            <div className="p-3 rounded-lg bg-surface-container border border-primary/30 text-primary font-body text-xs text-center">
+              {teamActionMsg}
+            </div>
+          )}
+
+          {/* Add New Team Form Drawer */}
+          {showAddTeam && (
+            <form
+              onSubmit={handleAddTeam}
+              className="glass-panel rounded-xl p-5 border border-primary/40 space-y-4"
+            >
+              <h4 className="font-label-caps text-label-caps text-primary uppercase">
+                Create New Team
+              </h4>
+
+              <div className="space-y-1 max-w-md">
+                <label className="font-label-caps text-xs text-on-surface-variant uppercase">
+                  Team Name
+                </label>
+                <input
+                  type="text"
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  placeholder="e.g. FRAGX Alpha"
+                  required
+                  minLength={2}
+                  maxLength={40}
+                  className="w-full bg-surface-container border border-surface-container-high rounded-lg px-3 py-2.5 font-label-caps text-label-caps text-on-surface focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div className="flex justify-end pt-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddTeam(false)}
+                  className="px-4 py-2 rounded-lg font-label-caps text-xs text-on-surface-variant uppercase border border-surface-container-high hover:bg-surface-container"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-primary text-on-primary font-label-caps text-label-caps px-6 py-2.5 rounded-lg uppercase font-bold"
+                >
+                  Add Team
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Teams Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {teams.length > 0 ? (
+              teams.map((t) => (
+                <div
+                  key={t.id}
+                  className={`glass-panel rounded-xl p-4 flex items-center justify-between gap-4 border transition-colors ${
+                    !t.isActive ? "opacity-50 bg-surface-container/30" : "hover:border-primary/40"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-bold">
+                      <span className="material-symbols-outlined text-xl">shield</span>
+                    </div>
+
+                    <div>
+                      <h4 className="font-headline text-headline-sm text-on-surface">
+                        {t.name}
+                      </h4>
+                      <span className="font-body text-xs text-on-surface-variant/70 block mt-0.5">
+                        Status: {t.isActive ? "Active Team" : "Inactive"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {/* Active Toggle Switch */}
+                    <button
+                      onClick={() => handleUpdateTeam(t.id, { isActive: !t.isActive })}
+                      disabled={loadingTeamId === t.id}
+                      className={`font-label-caps text-xs px-3 py-1.5 rounded border transition-colors ${
+                        t.isActive
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                          : "bg-surface-container text-on-surface-variant border-surface-variant hover:text-on-surface"
+                      }`}
+                    >
+                      {t.isActive ? "Active" : "Inactive"}
+                    </button>
+
+                    {/* Delete Team */}
+                    <button
+                      onClick={() => handleDeleteTeam(t.id, t.name)}
+                      disabled={loadingTeamId === t.id}
+                      title="Delete Team"
+                      className="p-1.5 text-on-surface-variant hover:text-error transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-lg">delete</span>
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-2 text-center py-10 text-on-surface-variant font-label-caps text-label-caps glass-panel rounded-xl">
+                NO TEAMS CONFIGURED YET. CLICK "+ ADD TEAM" TO CREATE BGMI MATCH TEAMS.
               </div>
             )}
           </div>

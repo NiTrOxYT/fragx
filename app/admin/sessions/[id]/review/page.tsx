@@ -30,8 +30,31 @@ export default async function ReviewSessionPage({ params }: ReviewSessionPagePro
 
   const mainMvp = mvpData?.players[0];
   const formattedDate = formatSessionDate(session.date);
-  const totalKills = session.matches.reduce((acc, m) => acc + m.kills, 0);
 
+  const mappedMatches = session.matches.map((m: any) => {
+    const isMultiTeam = m.matchTeams && m.matchTeams.length > 0;
+    const topTeam = isMultiTeam ? m.matchTeams[0] : null;
+    const kills = isMultiTeam
+      ? m.matchTeams.reduce(
+          (acc: number, mt: any) =>
+            acc + mt.players.reduce((pAcc: number, p: any) => pAcc + p.kills, 0),
+          0
+        )
+      : m.kills || 0;
+    const placement = isMultiTeam ? topTeam?.placement || 1 : m.placement || 1;
+    const playerName = isMultiTeam ? topTeam?.team.name || "Team" : m.player?.name || "Player";
+
+    return {
+      id: m.id,
+      matchNumber: m.matchNumber,
+      playerName,
+      kills,
+      placement,
+      isWin: placement === 1,
+    };
+  });
+
+  const totalKills = mappedMatches.reduce((acc, m) => acc + m.kills, 0);
 
   return (
     <SessionReviewClient
@@ -43,15 +66,9 @@ export default async function ReviewSessionPage({ params }: ReviewSessionPagePro
         totalKills,
         mvpName: mainMvp?.name || "None",
         mvpKills: mainMvp?.totalKills || 0,
-        matches: session.matches.map((m) => ({
-          id: m.id,
-          matchNumber: m.matchNumber,
-          playerName: m.player.name,
-          kills: m.kills,
-          placement: m.placement,
-          isWin: m.placement === 1,
-        })),
+        matches: mappedMatches,
       }}
     />
   );
+
 }

@@ -25,7 +25,7 @@ export async function getAllPlayers(): Promise<PlayerRecord[]> {
 }
 
 export async function getPlayerById(id: string) {
-  const [player, matches] = await Promise.all([
+  const [player, legacyMatches, multiTeamMatchPlayers] = await Promise.all([
     (prisma.player as any).findUnique({
       where: { id },
       select: {
@@ -36,7 +36,7 @@ export async function getPlayerById(id: string) {
         isActive: true,
       },
     }) as Promise<PlayerRecord | null>,
-    prisma.match.findMany({
+    (prisma.match as any).findMany({
       where: {
         playerId: id,
         session: {
@@ -55,18 +55,67 @@ export async function getPlayerById(id: string) {
       },
       orderBy: { createdAt: "desc" },
     }),
+    (prisma as any).matchPlayer.findMany({
+
+      where: {
+        playerId: id,
+        matchTeam: {
+          match: {
+            session: { status: "PUBLISHED" },
+          },
+        },
+      },
+      select: {
+        id: true,
+        kills: true,
+        createdAt: true,
+        matchTeam: {
+          select: {
+            placement: true,
+            match: {
+              select: {
+                id: true,
+                matchNumber: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   if (!player) return null;
 
-  const matchesCount = matches.length;
-  const totalKills = matches.reduce((acc, m) => acc + m.kills, 0);
-  const wins = matches.filter((m) => m.placement === 1).length;
+  // Combine matches
+  const combinedMatches = [
+    ...legacyMatches.map((m: any) => ({
+      id: m.id,
+      matchNumber: m.matchNumber,
+      kills: m.kills || 0,
+      placement: m.placement || 999,
+      createdAt: m.createdAt,
+    })),
+    ...multiTeamMatchPlayers.map((mp: any) => ({
+      id: mp.matchTeam.match.id,
+      matchNumber: mp.matchTeam.match.matchNumber,
+      kills: mp.kills || 0,
+      placement: mp.matchTeam.placement || 999,
+      createdAt: mp.createdAt,
+    })),
+  ];
+
+  combinedMatches.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const matchesCount = combinedMatches.length;
+  const totalKills = combinedMatches.reduce((acc, m) => acc + m.kills, 0);
+  const wins = combinedMatches.filter((m) => m.placement === 1).length;
   const avgKills = matchesCount > 0 ? Number((totalKills / matchesCount).toFixed(1)) : 0;
   const kd = matchesCount > 0 ? Number((totalKills / matchesCount).toFixed(1)) : 0;
 
   // Performance chart data: last 10 matches in chronological order
-  const performanceMatches = [...matches].reverse().slice(-10);
+  const performanceMatches = [...combinedMatches].reverse().slice(-10);
   const performance = performanceMatches.map((m, idx) => ({
     matchIndex: idx + 1,
     kills: m.kills,
@@ -87,9 +136,10 @@ export async function getPlayerById(id: string) {
       kd,
     },
     performance,
-    recentMatches: matches.slice(0, 10),
+    recentMatches: combinedMatches.slice(0, 10),
   };
 }
+
 
 export async function createPlayer(
   name: string,

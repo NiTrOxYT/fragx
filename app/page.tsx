@@ -153,52 +153,66 @@ export default async function HomePage() {
 
         {recentMatches.length > 0 ? (
           <div className="space-y-3">
-            {recentMatches.map((match) => (
-              <Link
-                key={match.id}
-                href={`/matches/${match.id}`}
-                className="glass-panel p-3 rounded-lg flex items-center gap-4 hover:bg-surface-container transition-colors group cursor-pointer border-l-4 border-l-primary/80 block"
-              >
-                <div className="flex items-center gap-4 w-full">
-                  <div className="w-16 h-12 rounded bg-surface-container-low overflow-hidden relative border border-outline-variant/30 flex-shrink-0">
-                    <img
-                      src={match.screenshotUrl}
-                      alt={`Match ${match.matchNumber}`}
-                      className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity"
-                    />
-                    <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded" />
-                  </div>
+            {recentMatches.map((match: any) => {
+              const isMultiTeam = match.matchTeams && match.matchTeams.length > 0;
+              const topTeam = isMultiTeam ? match.matchTeams[0] : null;
+              const totalKills = isMultiTeam
+                ? match.matchTeams.reduce(
+                    (acc: number, mt: any) =>
+                      acc + mt.players.reduce((pAcc: number, p: any) => pAcc + p.kills, 0),
+                    0
+                  )
+                : match.kills || 0;
+              const placement = isMultiTeam ? topTeam?.placement || 1 : match.placement || 1;
+              const displayName = isMultiTeam ? topTeam?.team.name || "Squad" : match.player?.name || "Player";
 
-                  <div className="flex-1 flex flex-col">
-                    <span className="font-stat-value text-stat-value text-on-surface group-hover:text-primary transition-colors">
-                      Match {match.matchNumber < 10 ? `0${match.matchNumber}` : match.matchNumber}
-                    </span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="font-label-caps text-[10px] text-on-surface-variant">
-                        {match.player.name}
+              return (
+                <Link
+                  key={match.id}
+                  href={`/matches/${match.id}`}
+                  className="glass-panel p-3 rounded-lg flex items-center gap-4 hover:bg-surface-container transition-colors group cursor-pointer border-l-4 border-l-primary/80 block"
+                >
+                  <div className="flex items-center gap-4 w-full">
+                    <div className="w-16 h-12 rounded bg-surface-container-low overflow-hidden relative border border-outline-variant/30 flex-shrink-0">
+                      <img
+                        src={match.screenshotUrl}
+                        alt={`Match ${match.matchNumber}`}
+                        className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity"
+                      />
+                      <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded" />
+                    </div>
+
+                    <div className="flex-1 flex flex-col">
+                      <span className="font-stat-value text-stat-value text-on-surface group-hover:text-primary transition-colors">
+                        Match {match.matchNumber < 10 ? `0${match.matchNumber}` : match.matchNumber}
                       </span>
-                      <span className="w-1 h-1 rounded-full bg-outline-variant" />
-                      <span className="font-label-caps text-[10px] text-primary/80">
-                        {match.kills} KILLS
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-label-caps text-[10px] text-on-surface-variant">
+                          {displayName}
+                        </span>
+                        <span className="w-1 h-1 rounded-full bg-outline-variant" />
+                        <span className="font-label-caps text-[10px] text-primary/80">
+                          {totalKills} KILLS
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex-shrink-0 px-3 py-1 rounded bg-surface-container-low border border-outline-variant/50 flex flex-col items-center justify-center">
+                      <span className="font-label-caps text-[10px] text-on-surface-variant">
+                        RANK
+                      </span>
+                      <span
+                        className={`font-stat-value text-stat-value ${
+                          placement === 1 ? "text-gold" : "text-on-surface"
+                        }`}
+                      >
+                        #{placement}
                       </span>
                     </div>
                   </div>
-
-                  <div className="flex-shrink-0 px-3 py-1 rounded bg-surface-container-low border border-outline-variant/50 flex flex-col items-center justify-center">
-                    <span className="font-label-caps text-[10px] text-on-surface-variant">
-                      RANK
-                    </span>
-                    <span
-                      className={`font-stat-value text-stat-value ${
-                        match.placement === 1 ? "text-gold" : "text-on-surface"
-                      }`}
-                    >
-                      #{match.placement}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <EmptyState title="No Recent Matches" description="Matches logged by admin will appear here." />
