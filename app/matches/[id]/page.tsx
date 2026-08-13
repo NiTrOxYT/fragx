@@ -1,4 +1,5 @@
 import { getMatchById } from "@/lib/services/matches";
+import { getGoldenGunAward } from "@/lib/services/stats";
 import { formatSessionDate } from "@/lib/utils/dates";
 import { notFound } from "next/navigation";
 import MatchDetailsClient from "./MatchDetailsClient";
@@ -18,6 +19,7 @@ export default async function MatchDetailsPage({ params }: MatchDetailsPageProps
     notFound();
   }
 
+  const goldenGunData = await getGoldenGunAward(match.session.id);
   const formattedDate = formatSessionDate(match.session.date);
 
   const matchTeams = match.matchTeams?.map((mt: any) => ({
@@ -32,6 +34,9 @@ export default async function MatchDetailsPage({ params }: MatchDetailsPageProps
     })),
   })) || [];
 
+  const goldenGunPlayerIds = goldenGunData?.winners.map((w) => w.id) || [];
+  const goldenGunPeakKills = goldenGunData?.peakKills || 0;
+
   return (
     <MatchDetailsClient
       match={{
@@ -45,6 +50,8 @@ export default async function MatchDetailsPage({ params }: MatchDetailsPageProps
         duration: match.duration || "20:00 MIN",
         matchTeams,
       }}
+      goldenGunPlayerIds={goldenGunPlayerIds}
+      goldenGunPeakKills={goldenGunPeakKills}
     />
   );
 }

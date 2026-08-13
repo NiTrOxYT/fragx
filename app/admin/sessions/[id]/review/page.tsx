@@ -1,6 +1,6 @@
 import { verifyAdminAuth } from "@/lib/services/admin";
 import { getSessionById } from "@/lib/services/sessions";
-import { getMVP } from "@/lib/services/stats";
+import { getMVP, getGoldenGunAward } from "@/lib/services/stats";
 import { formatSessionDate } from "@/lib/utils/dates";
 import { notFound, redirect } from "next/navigation";
 import SessionReviewClient from "./SessionReviewClient";
@@ -19,9 +19,10 @@ export default async function ReviewSessionPage({ params }: ReviewSessionPagePro
     redirect("/admin");
   }
 
-  const [session, mvpData] = await Promise.all([
+  const [session, mvpData, goldenGunData] = await Promise.all([
     getSessionById(params.id),
     getMVP(params.id),
+    getGoldenGunAward(params.id),
   ]);
 
   if (!session) {
@@ -55,6 +56,8 @@ export default async function ReviewSessionPage({ params }: ReviewSessionPagePro
   });
 
   const totalKills = mappedMatches.reduce((acc, m) => acc + m.kills, 0);
+  const goldenGunNames = goldenGunData?.winners.map((w) => w.name).join(" & ") || "None";
+  const goldenGunKills = goldenGunData?.peakKills || 0;
 
   return (
     <SessionReviewClient
@@ -66,9 +69,10 @@ export default async function ReviewSessionPage({ params }: ReviewSessionPagePro
         totalKills,
         mvpName: mainMvp?.name || "None",
         mvpKills: mainMvp?.totalKills || 0,
+        goldenGunNames,
+        goldenGunKills,
         matches: mappedMatches,
       }}
     />
   );
-
 }

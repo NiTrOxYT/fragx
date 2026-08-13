@@ -29,9 +29,15 @@ interface MatchDetailsClientProps {
     duration: string;
     matchTeams?: MatchTeamDetail[];
   };
+  goldenGunPlayerIds?: string[];
+  goldenGunPeakKills?: number;
 }
 
-export default function MatchDetailsClient({ match }: MatchDetailsClientProps) {
+export default function MatchDetailsClient({
+  match,
+  goldenGunPlayerIds = [],
+  goldenGunPeakKills = 0,
+}: MatchDetailsClientProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -44,7 +50,6 @@ export default function MatchDetailsClient({ match }: MatchDetailsClientProps) {
         0
       )
     : match.kills;
-
 
   const handleShare = async () => {
     const titleText = isMultiTeam
@@ -145,29 +150,54 @@ export default function MatchDetailsClient({ match }: MatchDetailsClientProps) {
                   </div>
 
                   <div className="space-y-2">
-                    {team.players.map((p) => (
-                      <div
-                        key={p.id}
-                        className="flex justify-between items-center p-2 rounded-lg bg-surface-container/40"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full border border-primary/30 overflow-hidden bg-surface-container flex items-center justify-center">
-                            <img
-                              src={p.avatarUrl || "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80"}
-                              alt={p.name}
-                              className="w-full h-full object-cover"
-                            />
+                    {team.players.map((p) => {
+                      const isGoldenGun =
+                        goldenGunPeakKills > 0 &&
+                        p.kills === goldenGunPeakKills &&
+                        goldenGunPlayerIds.includes(p.id);
+
+                      return (
+                        <div
+                          key={p.id}
+                          className={`flex justify-between items-center p-2.5 rounded-lg border transition-colors ${
+                            isGoldenGun
+                              ? "bg-[#D4AF37]/10 border-[#D4AF37]/40 shadow-[0_0_12px_rgba(212,175,55,0.15)]"
+                              : "bg-surface-container/40 border-transparent"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full border border-primary/30 overflow-hidden bg-surface-container flex items-center justify-center">
+                              <img
+                                src={
+                                  p.avatarUrl ||
+                                  "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80"
+                                }
+                                alt={p.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div>
+                              <span className="font-headline text-sm text-on-surface block">
+                                {p.name}
+                              </span>
+                              {isGoldenGun && (
+                                <span className="font-label-caps text-[10px] text-gold font-bold flex items-center gap-1">
+                                  🏆 GOLDEN GUN
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <span className="font-headline text-sm text-on-surface">
-                            {p.name}
+
+                          <span
+                            className={`font-stat-value text-sm font-bold font-mono ${
+                              isGoldenGun ? "text-gold" : "text-primary"
+                            }`}
+                          >
+                            {p.kills} KILLS
                           </span>
                         </div>
-
-                        <span className="font-stat-value text-sm text-primary font-bold font-mono">
-                          {p.kills} KILLS
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}

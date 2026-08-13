@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { getMVP, getSessionSummary, getRecentMatches } from "@/lib/services/stats";
+import { getMVP, getGoldenGunAward, getSessionSummary, getRecentMatches } from "@/lib/services/stats";
 import GoldenGunAward from "@/components/common/GoldenGunAward";
 import EmptyState from "@/components/common/EmptyState";
 
 export const revalidate = 60; // 60-second ISR for fast public page delivery
 
 export default async function HomePage() {
-  const [mvpData, summary, recentMatches] = await Promise.all([
+  const [mvpData, goldenGunData, summary, recentMatches] = await Promise.all([
     getMVP(),
+    getGoldenGunAward(),
     getSessionSummary(),
     getRecentMatches(5),
   ]);
@@ -53,14 +54,15 @@ export default async function HomePage() {
               </h2>
               
               <GoldenGunAward
-                peakKills={mvpData.peakKills}
-                winnerName={mvpData.goldenGunWinner?.name}
+                peakKills={goldenGunData?.peakKills || 0}
+                winners={goldenGunData?.winners || []}
               />
               
               <p className="font-body text-body-md text-on-surface-variant max-w-md">
                 Top fragger from last night's session. Unstoppable momentum.
               </p>
             </div>
+
 
             {/* Highlight Stat */}
             <div className="flex flex-col items-center md:items-end md:ml-auto">

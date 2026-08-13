@@ -9,10 +9,15 @@ export interface MVPResult {
     bestPlacement: number;
   }[];
   peakKills: number;
-  goldenGunWinner: {
+}
+
+export interface GoldenGunAwardResult {
+  winners: {
+    id: string;
     name: string;
-    kills: number;
-  } | null;
+    avatarUrl: string;
+  }[];
+  peakKills: number;
 }
 
 export async function getLatestPublishedSession() {
@@ -55,6 +60,104 @@ export async function getLatestPublishedSession() {
       },
     },
   });
+}
+
+/**
+ * Calculates Golden Gun Award: Highest SINGLE-MATCH individual kill count in the session.
+ * Handles ties by returning all players who achieved that max single-match kill count.
+ */
+export async function getGoldenGunAward(sessionId?: string): Promise<GoldenGunAwardResult | null> {
+  let session;
+  if (sessionId) {
+    session = await (prisma.gamingSession as any).findUnique({
+      where: { id: sessionId },
+      select: {
+        id: true,
+        matches: {
+          select: {
+            id: true,
+            matchNumber: true,
+            kills: true,
+            playerId: true,
+            player: {
+              select: { id: true, name: true, avatarUrl: true },
+            },
+            matchTeams: {
+              select: {
+                players: {
+                  select: {
+                    kills: true,
+                    player: {
+                      select: { id: true, name: true, avatarUrl: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  } else {
+    session = await getLatestPublishedSession();
+  }
+
+  if (!session || session.matches.length === 0) {
+    return null;
+  }
+
+  let maxSingleMatchKills = 0;
+
+  // Pass 1: Find maximum single-match individual kill count
+  for (const match of session.matches) {
+    if (match.matchTeams && match.matchTeams.length > 0) {
+      for (const mt of match.matchTeams) {
+        for (const mp of mt.players) {
+          if (mp.kills > maxSingleMatchKills) {
+            maxSingleMatchKills = mp.kills;
+          }
+        }
+      }
+    } else if (match.playerId && match.kills) {
+      if (match.kills > maxSingleMatchKills) {
+        maxSingleMatchKills = match.kills;
+      }
+    }
+  }
+
+  if (maxSingleMatchKills === 0) {
+    return { winners: [], peakKills: 0 };
+  }
+
+  // Pass 2: Collect all unique players who achieved maxSingleMatchKills in any match
+  const winnersMap = new Map<string, { id: string; name: string; avatarUrl: string }>();
+
+  for (const match of session.matches) {
+    if (match.matchTeams && match.matchTeams.length > 0) {
+      for (const mt of match.matchTeams) {
+        for (const mp of mt.players) {
+          if (mp.kills === maxSingleMatchKills) {
+            winnersMap.set(mp.player.id, {
+              id: mp.player.id,
+              name: mp.player.name,
+              avatarUrl: mp.player.avatarUrl,
+            });
+          }
+        }
+      }
+    } else if (match.playerId && match.player && match.kills === maxSingleMatchKills) {
+      winnersMap.set(match.player.id, {
+        id: match.player.id,
+        name: match.player.name,
+        avatarUrl: match.player.avatarUrl,
+      });
+    }
+  }
+
+  return {
+    winners: Array.from(winnersMap.values()),
+    peakKills: maxSingleMatchKills,
+  };
 }
 
 export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
@@ -102,7 +205,7 @@ export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
     return null;
   }
 
-  // Aggregate stats per player
+  // Aggregate total session stats per player for MVP (total kills + placement tie-breaker)
   const playerStatsMap = new Map<
     string,
     {
@@ -111,12 +214,10 @@ export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
       avatarUrl: string;
       totalKills: number;
       bestPlacement: number;
-      peakKills: number;
     }
   >();
 
   let maxSingleMatchKills = 0;
-  let goldenGunWinner: { name: string; kills: number } | null = null;
 
   for (const match of session.matches) {
     if (match.matchTeams && match.matchTeams.length > 0) {
@@ -130,25 +231,17 @@ export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
             avatarUrl: mp.player.avatarUrl,
             totalKills: 0,
             bestPlacement: 999,
-            peakKills: 0,
           };
 
           existing.totalKills += mp.kills;
           if (mt.placement < existing.bestPlacement) {
             existing.bestPlacement = mt.placement;
           }
-          if (mp.kills > existing.peakKills) {
-            existing.peakKills = mp.kills;
-          }
 
           playerStatsMap.set(pId, existing);
 
           if (mp.kills > maxSingleMatchKills) {
             maxSingleMatchKills = mp.kills;
-            goldenGunWinner = {
-              name: mp.player.name,
-              kills: mp.kills,
-            };
           }
         }
       }
@@ -161,25 +254,17 @@ export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
         avatarUrl: match.player.avatarUrl,
         totalKills: 0,
         bestPlacement: 999,
-        peakKills: 0,
       };
 
       existing.totalKills += match.kills || 0;
       if ((match.placement || 999) < existing.bestPlacement) {
         existing.bestPlacement = match.placement;
       }
-      if ((match.kills || 0) > existing.peakKills) {
-        existing.peakKills = match.kills;
-      }
 
       playerStatsMap.set(pId, existing);
 
       if ((match.kills || 0) > maxSingleMatchKills) {
         maxSingleMatchKills = match.kills;
-        goldenGunWinner = {
-          name: match.player.name,
-          kills: match.kills,
-        };
       }
     }
   }
@@ -211,7 +296,6 @@ export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
       bestPlacement: p.bestPlacement,
     })),
     peakKills: maxSingleMatchKills,
-    goldenGunWinner,
   };
 }
 

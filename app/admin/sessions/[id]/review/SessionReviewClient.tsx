@@ -22,9 +22,12 @@ interface SessionReviewClientProps {
     totalKills: number;
     mvpName: string;
     mvpKills: number;
+    goldenGunNames?: string;
+    goldenGunKills?: number;
     matches: MatchItem[];
   };
 }
+
 
 export default function SessionReviewClient({ session }: SessionReviewClientProps) {
   const router = useRouter();
@@ -138,7 +141,9 @@ export default function SessionReviewClient({ session }: SessionReviewClientProp
               </span>
             </div>
             <div className="flex flex-col z-10">
-              <span className="font-label-caps text-label-caps text-gold uppercase">SQUAD MVP</span>
+              <span className="font-label-caps text-label-caps text-gold uppercase font-bold">
+                SQUAD MVP (TOTAL SESSION KILLS)
+              </span>
               <span className="font-headline text-headline-md text-on-surface">
                 {session.mvpName}
               </span>
@@ -148,11 +153,40 @@ export default function SessionReviewClient({ session }: SessionReviewClientProp
                 {session.mvpKills}
               </span>
               <span className="font-label-caps text-label-caps text-on-surface-variant text-[10px]">
-                KILLS
+                TOTAL KILLS
+              </span>
+            </div>
+          </div>
+
+          {/* Golden Gun Card (Full Width) */}
+          <div className="glass-panel rounded-xl p-stack-md flex items-center gap-stack-md col-span-2 relative overflow-hidden border-[#D4AF37]/30 bg-gradient-to-r from-[#1f190e] to-[#171717]">
+            <div className="w-12 h-12 rounded-full bg-gold/10 border border-gold/40 flex items-center justify-center shrink-0 z-10 shadow-[0_0_12px_rgba(212,175,55,0.2)]">
+              <span
+                className="material-symbols-outlined text-gold text-2xl"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                military_tech
+              </span>
+            </div>
+            <div className="flex flex-col z-10">
+              <span className="font-label-caps text-label-caps text-gold uppercase font-bold">
+                🏆 GOLDEN GUN (PEAK SINGLE MATCH)
+              </span>
+              <span className="font-headline text-headline-md text-on-surface">
+                {session.goldenGunNames || "NO WINNER YET"}
+              </span>
+            </div>
+            <div className="ml-auto flex flex-col items-end z-10">
+              <span className="font-stat-value text-stat-value text-gold font-mono">
+                {session.goldenGunKills || 0}
+              </span>
+              <span className="font-label-caps text-label-caps text-on-surface-variant text-[10px]">
+                PEAK KILLS
               </span>
             </div>
           </div>
         </section>
+
 
         {/* Match List */}
         <section className="flex flex-col gap-stack-sm">
