@@ -8,7 +8,9 @@ const updatePlayerSchema = z.object({
   avatarUrl: z.string().optional(),
   role: z.enum(["PLAYER", "MODERATOR", "ADMIN"]).optional(),
   isActive: z.boolean().optional(),
+  secretKey: z.string().optional(),
 });
+
 
 export async function PATCH(
   request: Request,

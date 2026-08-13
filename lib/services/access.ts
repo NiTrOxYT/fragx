@@ -1,8 +1,15 @@
 import { cookies } from "next/headers";
+import { prisma } from "@/lib/db";
 import { cryptoNative } from "@/lib/auth-crypto";
 
 const ACCESS_COOKIE_NAME = "fragx_access_session";
 
+/**
+ * Verifies whether the current request has a valid access token cookie.
+ * Valid tokens can belong to:
+ * 1. Master Access Key (ACCESS_KEY environment variable)
+ * 2. Any active Player's unique Access Key in database
+ */
 export async function verifyAccessAuth(): Promise<boolean> {
   const cookieStore = cookies();
   const sessionToken = cookieStore.get(ACCESS_COOKIE_NAME)?.value;
@@ -11,20 +18,71 @@ export async function verifyAccessAuth(): Promise<boolean> {
     return false;
   }
 
-  const expectedKey = process.env.ACCESS_KEY || "FRAGX2026";
-  const expectedToken = cryptoNative(expectedKey);
-  return sessionToken === expectedToken;
+  const masterKey = process.env.ACCESS_KEY || "FRAGX2026";
+  const masterToken = cryptoNative(masterKey);
+
+  // Check if session token matches master key
+  if (sessionToken === masterToken) {
+    return true;
+  }
+
+  // Check if session token matches an active player's access key hash
+  try {
+    const player = await (prisma.player as any).findFirst({
+      where: {
+        accessKeyHash: sessionToken,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+    return !!player;
+  } catch (err) {
+    console.error("Error verifying player access auth:", err);
+    return false;
+  }
 }
 
+/**
+ * Validates the provided Access Key against Master Key or Player Access Keys.
+ * If valid, sets the HTTP-only access session cookie.
+ */
 export async function setAccessSession(key: string): Promise<boolean> {
-  const expectedKey = process.env.ACCESS_KEY || "FRAGX2026";
-  if (key !== expectedKey) {
+  const trimmedKey = key.trim();
+  if (!trimmedKey) return false;
+
+  const masterKey = process.env.ACCESS_KEY || "FRAGX2026";
+  const hashedToken = cryptoNative(trimmedKey);
+
+  let isValid = false;
+
+  // Check 1: Master Access Key
+  if (trimmedKey === masterKey) {
+    isValid = true;
+  } else {
+    // Check 2: Player Access Key in database
+    try {
+      const player = await (prisma.player as any).findFirst({
+        where: {
+          accessKeyHash: hashedToken,
+          isActive: true,
+        },
+        select: { id: true, name: true, role: true },
+      });
+      if (player) {
+        isValid = true;
+      }
+    } catch (err) {
+      console.error("Error checking player access key in DB:", err);
+    }
+  }
+
+  if (!isValid) {
     return false;
   }
 
-  const token = cryptoNative(expectedKey);
+  // Set HTTP-only session cookie with the hashed token
   const cookieStore = cookies();
-  cookieStore.set(ACCESS_COOKIE_NAME, token, {
+  cookieStore.set(ACCESS_COOKIE_NAME, hashedToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

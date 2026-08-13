@@ -146,11 +146,18 @@ export async function updatePlayer(
     avatarUrl?: string;
     role?: PlayerRole;
     isActive?: boolean;
+    secretKey?: string;
   }
 ): Promise<PlayerRecord> {
+  const updateData: any = { ...data };
+  if (data.secretKey && data.secretKey.trim() !== "") {
+    delete updateData.secretKey;
+    updateData.accessKeyHash = cryptoNative(data.secretKey.trim());
+  }
+
   return await (prisma.player as any).update({
     where: { id },
-    data,
+    data: updateData,
     select: {
       id: true,
       name: true,
@@ -160,6 +167,7 @@ export async function updatePlayer(
     },
   });
 }
+
 
 export async function deletePlayer(id: string) {
   return await prisma.player.delete({
