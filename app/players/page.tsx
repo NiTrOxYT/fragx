@@ -9,7 +9,8 @@ export default async function PlayersPage() {
   const leaderboard = await getLeaderboard("ALL TIME");
 
   return (
-    <main className="max-w-md mx-auto px-safe-margin pt-20 pb-24 flex flex-col gap-stack-lg w-full">
+    <main className="max-w-md mx-auto px-safe-margin pt-header-safe md:pt-20 pb-24 flex flex-col gap-stack-lg w-full">
+
       <section className="flex flex-col gap-stack-sm pt-stack-sm">
         <h2 className="font-headline text-headline-md text-on-surface uppercase">
           SQUAD MEMBERS

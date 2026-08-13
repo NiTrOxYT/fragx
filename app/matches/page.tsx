@@ -27,7 +27,8 @@ export default async function MatchHistoryPage({ searchParams }: MatchHistoryPag
   }
 
   return (
-    <main className="pt-20 px-safe-margin max-w-3xl mx-auto space-y-stack-lg md:pt-16 pb-24 w-full">
+    <main className="pt-header-safe md:pt-20 px-safe-margin max-w-3xl mx-auto space-y-stack-lg pb-24 w-full">
+
       {/* Header & Filters */}
       <div className="flex flex-col space-y-stack-sm pt-4">
         <h2 className="font-headline text-headline-lg text-on-surface">Match History</h2>

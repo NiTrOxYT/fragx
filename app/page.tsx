@@ -15,7 +15,8 @@ export default async function HomePage() {
   const mainMvp = mvpData?.players[0];
 
   return (
-    <main className="pt-24 px-safe-margin max-w-7xl mx-auto space-y-stack-lg flex flex-col items-center w-full pb-[100px] md:pb-12">
+    <main className="pt-header-safe md:pt-24 px-safe-margin max-w-7xl mx-auto space-y-stack-lg flex flex-col items-center w-full pb-[100px] md:pb-12">
+
       {/* Hero Section: MVP */}
       {mainMvp ? (
         <section className="w-full max-w-3xl relative rounded-xl overflow-hidden glass-panel elite-glow border border-[#D4AF37]/30 p-1">

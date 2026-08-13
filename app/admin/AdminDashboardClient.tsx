@@ -218,7 +218,8 @@ export default function AdminDashboardClient({
   }
 
   return (
-    <main className="flex-1 w-full max-w-7xl mx-auto px-safe-margin pt-24 pb-stack-lg flex flex-col gap-stack-lg">
+    <main className="flex-1 w-full max-w-7xl mx-auto px-safe-margin pt-header-safe md:pt-24 pb-stack-lg flex flex-col gap-stack-lg">
+
       {/* Header Section */}
       <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>

@@ -15,7 +15,8 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
   const leaderboard = await getLeaderboard(timeframe);
 
   return (
-    <main className="flex-1 w-full max-w-md mx-auto px-safe-margin flex flex-col gap-stack-lg mt-stack-md pt-20 pb-24">
+    <main className="flex-1 w-full max-w-md mx-auto px-safe-margin flex flex-col gap-stack-lg pt-header-safe md:pt-20 pb-24">
+
       {/* Header Section */}
       <section className="flex flex-col gap-stack-sm">
         <h2 className="font-headline text-headline-md text-on-surface uppercase">

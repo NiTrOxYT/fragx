@@ -24,7 +24,8 @@ export default function TopHeader() {
   }
 
   return (
-    <header className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-surface-container-high/50 md:border-none">
+    <header className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-surface-container-high/50 md:border-none pt-safe">
+
       <div className="flex items-center justify-between px-20px md:px-8 h-16 w-full max-w-7xl mx-auto relative">
         <div className="flex items-center gap-4">
           {showBackButton ? (
