@@ -1,0 +1,50 @@
+// Prisma schema for FRAGX
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Player {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  avatarUrl String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  matches   Match[]
+}
+
+model GamingSession {
+  id          String    @id @default(cuid())
+  date        DateTime
+  status      String    @default("DRAFT") // DRAFT | PUBLISHED
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  matches     Match[]
+
+  @@index([status])
+  @@index([date])
+}
+
+model Match {
+  id            String        @id @default(cuid())
+  sessionId     String
+  session       GamingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  matchNumber   Int
+  playerId      String
+  player        Player        @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  kills         Int
+  placement     Int
+  screenshotUrl String
+  duration      String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([sessionId, matchNumber])
+  @@index([sessionId])
+  @@index([playerId])
+}

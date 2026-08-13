@@ -1,0 +1,271 @@
+import { prisma } from "@/lib/db";
+
+export interface MVPResult {
+  players: {
+    id: string;
+    name: string;
+    avatarUrl: string;
+    totalKills: number;
+    bestPlacement: number;
+  }[];
+  peakKills: number;
+  goldenGunWinner: {
+    name: string;
+    kills: number;
+  } | null;
+}
+
+export async function getLatestPublishedSession() {
+  return await prisma.gamingSession.findFirst({
+    where: { status: "PUBLISHED" },
+    orderBy: { date: "desc" },
+    include: {
+      matches: {
+        include: {
+          player: true,
+        },
+        orderBy: { matchNumber: "asc" },
+      },
+    },
+  });
+}
+
+export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
+  let session;
+  if (sessionId) {
+    session = await prisma.gamingSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        matches: {
+          include: { player: true },
+        },
+      },
+    });
+  } else {
+    session = await getLatestPublishedSession();
+  }
+
+  if (!session || session.matches.length === 0) {
+    return null;
+  }
+
+  // Aggregate stats per player
+  const playerStatsMap = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      avatarUrl: string;
+      totalKills: number;
+      bestPlacement: number;
+      peakKills: number;
+    }
+  >();
+
+  let maxSingleMatchKills = 0;
+  let goldenGunWinner: { name: string; kills: number } | null = null;
+
+  for (const match of session.matches) {
+    const pId = match.playerId;
+    const existing = playerStatsMap.get(pId) || {
+      id: pId,
+      name: match.player.name,
+      avatarUrl: match.player.avatarUrl,
+      totalKills: 0,
+      bestPlacement: 999,
+      peakKills: 0,
+    };
+
+    existing.totalKills += match.kills;
+    if (match.placement < existing.bestPlacement) {
+      existing.bestPlacement = match.placement;
+    }
+    if (match.kills > existing.peakKills) {
+      existing.peakKills = match.kills;
+    }
+
+    playerStatsMap.set(pId, existing);
+
+    if (match.kills > maxSingleMatchKills) {
+      maxSingleMatchKills = match.kills;
+      goldenGunWinner = {
+        name: match.player.name,
+        kills: match.kills,
+      };
+    }
+  }
+
+  const aggregated = Array.from(playerStatsMap.values());
+  if (aggregated.length === 0) return null;
+
+  // Sort by totalKills desc, bestPlacement asc
+  aggregated.sort((a, b) => {
+    if (b.totalKills !== a.totalKills) {
+      return b.totalKills - a.totalKills;
+    }
+    return a.bestPlacement - b.bestPlacement;
+  });
+
+  const topPlayer = aggregated[0];
+  const mvps = aggregated.filter(
+    (p) =>
+      p.totalKills === topPlayer.totalKills &&
+      p.bestPlacement === topPlayer.bestPlacement
+  );
+
+  return {
+    players: mvps.map((p) => ({
+      id: p.id,
+      name: p.name,
+      avatarUrl: p.avatarUrl,
+      totalKills: p.totalKills,
+      bestPlacement: p.bestPlacement,
+    })),
+    peakKills: maxSingleMatchKills,
+    goldenGunWinner,
+  };
+}
+
+export async function getSessionSummary(sessionId?: string) {
+  let session;
+  if (sessionId) {
+    session = await prisma.gamingSession.findUnique({
+      where: { id: sessionId },
+      include: { matches: true },
+    });
+  } else {
+    session = await getLatestPublishedSession();
+  }
+
+  if (!session || session.matches.length === 0) {
+    return {
+      matchCount: 0,
+      totalKills: 0,
+      winRate: 0,
+    };
+  }
+
+  const matchCount = session.matches.length;
+  const totalKills = session.matches.reduce((acc, m) => acc + m.kills, 0);
+  const wins = session.matches.filter((m) => m.placement === 1).length;
+  const winRate = Math.round((wins / matchCount) * 100);
+
+  return {
+    matchCount,
+    totalKills,
+    winRate,
+  };
+}
+
+export async function getRecentMatches(limit = 10) {
+  const matches = await prisma.match.findMany({
+    where: {
+      session: {
+        status: "PUBLISHED",
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: {
+      player: true,
+      session: true,
+    },
+  });
+
+  return matches;
+}
+
+export async function getLeaderboard(filter: "ALL TIME" | "THIS MONTH" | "THIS WEEK" = "ALL TIME") {
+  const now = new Date();
+  let startDate: Date | undefined;
+
+  if (filter === "THIS MONTH") {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (filter === "THIS WEEK") {
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday start
+    startDate = new Date(now.setDate(diff));
+    startDate.setHours(0, 0, 0, 0);
+  }
+
+  const matches = await prisma.match.findMany({
+    where: {
+      session: {
+        status: "PUBLISHED",
+        ...(startDate ? { date: { gte: startDate } } : {}),
+      },
+    },
+    include: {
+      player: true,
+    },
+  });
+
+  const playerMap = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      avatarUrl: string;
+      matchesCount: number;
+      totalKills: number;
+      wins: number;
+    }
+  >();
+
+  for (const match of matches) {
+    const pId = match.playerId;
+    const existing = playerMap.get(pId) || {
+      id: pId,
+      name: match.player.name,
+      avatarUrl: match.player.avatarUrl,
+      matchesCount: 0,
+      totalKills: 0,
+      wins: 0,
+    };
+
+    existing.matchesCount += 1;
+    existing.totalKills += match.kills;
+    if (match.placement === 1) {
+      existing.wins += 1;
+    }
+
+    playerMap.set(pId, existing);
+  }
+
+  // Also include players with 0 matches if filter is ALL TIME
+  if (filter === "ALL TIME") {
+    const allPlayers = await prisma.player.findMany();
+    for (const p of allPlayers) {
+      if (!playerMap.has(p.id)) {
+        playerMap.set(p.id, {
+          id: p.id,
+          name: p.name,
+          avatarUrl: p.avatarUrl,
+          matchesCount: 0,
+          totalKills: 0,
+          wins: 0,
+        });
+      }
+    }
+  }
+
+  const leaderboard = Array.from(playerMap.values()).map((p) => {
+    const kd = p.matchesCount > 0 ? Number((p.totalKills / p.matchesCount).toFixed(1)) : 0;
+    return {
+      ...p,
+      kd,
+    };
+  });
+
+  // Sort by K/D desc, then totalKills desc, then matchesCount desc
+  leaderboard.sort((a, b) => {
+    if (b.kd !== a.kd) return b.kd - a.kd;
+    if (b.totalKills !== a.totalKills) return b.totalKills - a.totalKills;
+    return b.matchesCount - a.matchesCount;
+  });
+
+  return leaderboard.map((item, index) => ({
+    rank: index + 1,
+    ...item,
+  }));
+}
