@@ -1,6 +1,7 @@
 import { verifyAdminAuth } from "@/lib/services/admin";
 import { getSessionById } from "@/lib/services/sessions";
 import { getMVP } from "@/lib/services/stats";
+import { formatSessionDate } from "@/lib/utils/dates";
 import { notFound, redirect } from "next/navigation";
 import SessionReviewClient from "./SessionReviewClient";
 
@@ -28,15 +29,9 @@ export default async function ReviewSessionPage({ params }: ReviewSessionPagePro
   }
 
   const mainMvp = mvpData?.players[0];
-
-  const dateObj = new Date(session.date);
-  const formattedDate = dateObj.toLocaleDateString("en-US", {
-    month: "short",
-    day: "2-digit",
-    year: "numeric",
-  }).toUpperCase();
-
+  const formattedDate = formatSessionDate(session.date);
   const totalKills = session.matches.reduce((acc, m) => acc + m.kills, 0);
+
 
   return (
     <SessionReviewClient

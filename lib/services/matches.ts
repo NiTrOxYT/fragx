@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { formatSessionDate } from "@/lib/utils/dates";
 
 export async function getMatchById(id: string) {
   return await prisma.match.findUnique({
@@ -65,12 +66,7 @@ export async function getGroupedMatchHistory() {
   const groupsMap = new Map<string, typeof matches>();
 
   for (const match of matches) {
-    const dateObj = new Date(match.session.date);
-    const dateStr = dateObj.toLocaleDateString("en-US", {
-      month: "short",
-      day: "2-digit",
-      year: "numeric",
-    }).toUpperCase();
+    const dateStr = formatSessionDate(match.session.date);
 
     const existing = groupsMap.get(dateStr) || [];
     existing.push(match);
@@ -84,6 +80,7 @@ export async function getGroupedMatchHistory() {
 
   return result;
 }
+
 
 export async function createMatch(data: {
   sessionId: string;

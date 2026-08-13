@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/services/admin";
 import { createMatch } from "@/lib/services/matches";
+import { getOrCreateSessionForDate, getOrCreateActiveDraftSession } from "@/lib/services/sessions";
 import { z } from "zod";
 
 const createMatchSchema = z.object({
-  sessionId: z.string().min(1, "Session ID is required"),
+  sessionId: z.string().optional(),
+  sessionDate: z.string().optional(),
   matchNumber: z.number().int().min(1, "Match number must be at least 1"),
   playerId: z.string().min(1, "Player selection is required"),
   kills: z.number().int().min(0, "Kills must be 0 or greater"),
@@ -18,7 +20,6 @@ const createMatchSchema = z.object({
   duration: z.string().optional(),
 });
 
-
 export async function POST(request: Request) {
   const isAuth = await verifyAdminAuth();
   if (!isAuth) {
@@ -29,7 +30,24 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = createMatchSchema.parse(body);
 
-    const match = await createMatch(parsed);
+    let targetSessionId = parsed.sessionId;
+    if (!targetSessionId && parsed.sessionDate) {
+      const session = await getOrCreateSessionForDate(parsed.sessionDate);
+      targetSessionId = session.id;
+    } else if (!targetSessionId) {
+      const session = await getOrCreateActiveDraftSession();
+      targetSessionId = session.id;
+    }
+
+    const match = await createMatch({
+      sessionId: targetSessionId,
+      matchNumber: parsed.matchNumber,
+      playerId: parsed.playerId,
+      kills: parsed.kills,
+      placement: parsed.placement,
+      screenshotUrl: parsed.screenshotUrl,
+      duration: parsed.duration,
+    });
     return NextResponse.json({ match }, { status: 201 });
   } catch (error: any) {
     console.error("Create match error:", error);
@@ -39,3 +57,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

@@ -1,6 +1,7 @@
 import { verifyAdminAuth } from "@/lib/services/admin";
 import { getOrCreateActiveDraftSession, getAllSessions } from "@/lib/services/sessions";
 import { getAllPlayers } from "@/lib/services/players";
+import { formatSessionDate } from "@/lib/utils/dates";
 import MatchFormClient from "./MatchFormClient";
 import { redirect } from "next/navigation";
 
@@ -27,11 +28,7 @@ export default async function AddMatchPage() {
       nextMatchNumber={nextMatchNum}
       sessions={sessions.map((s) => ({
         id: s.id,
-        dateStr: new Date(s.date).toLocaleDateString("en-US", {
-          month: "short",
-          day: "2-digit",
-          year: "numeric",
-        }),
+        dateStr: formatSessionDate(s.date),
         status: s.status,
       }))}
       initialPlayers={players.map((p) => ({
@@ -41,3 +38,4 @@ export default async function AddMatchPage() {
     />
   );
 }
+

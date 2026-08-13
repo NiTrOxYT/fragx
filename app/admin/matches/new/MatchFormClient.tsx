@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import CalendarDatePicker from "@/components/common/CalendarDatePicker";
 
 interface PlayerOption {
   id: string;
@@ -29,6 +30,15 @@ export default function MatchFormClient({
 }: MatchFormClientProps) {
   const router = useRouter();
 
+  const getTodayYMD = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const [selectedDate, setSelectedDate] = useState(getTodayYMD());
   const [sessionId, setSessionId] = useState(activeSessionId);
   const [matchNumber, setMatchNumber] = useState(nextMatchNumber);
   const [playerId, setPlayerId] = useState(initialPlayers[0]?.id || "");
@@ -46,6 +56,26 @@ export default function MatchFormClient({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const handleDateChange = async (newDateStr: string) => {
+    setSelectedDate(newDateStr);
+    try {
+      const res = await fetch("/api/sessions/by-date", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateStr: newDateStr }),
+      });
+      const data = await res.json();
+      if (res.ok && data.session) {
+        setSessionId(data.session.id);
+        if (data.session.matches) {
+          setMatchNumber(data.session.matches.length + 1);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to sync session for date:", err);
+    }
+  };
 
   // Helper for URL validation (HTTPS or Data URL)
   const isValidHttpsUrl = (url: string) => {
@@ -86,7 +116,6 @@ export default function MatchFormClient({
     };
     reader.readAsDataURL(file);
   };
-
 
   // Add new player on the fly
   const handleCreatePlayer = async () => {
@@ -148,6 +177,7 @@ export default function MatchFormClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
+          sessionDate: selectedDate,
           matchNumber: Number(matchNumber),
           playerId,
           kills: Number(kills),
@@ -160,8 +190,8 @@ export default function MatchFormClient({
       if (!res.ok) {
         setErrorMsg(data.error || "Failed to create match");
       } else {
-        // Redirect to review session page
-        router.push(`/admin/sessions/${sessionId}/review`);
+        const targetSessionId = sessionId || data.match?.sessionId;
+        router.push(`/admin/sessions/${targetSessionId}/review`);
       }
     } catch (err) {
       setErrorMsg("Something went wrong while saving the match.");
@@ -274,25 +304,14 @@ export default function MatchFormClient({
           )}
         </div>
 
-
-        {/* Session & Match Number Row */}
-        <div className="grid grid-cols-2 gap-gutter">
-          <div className="flex flex-col gap-base">
-            <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">
-              Session
-            </label>
-            <select
-              value={sessionId}
-              onChange={(e) => setSessionId(e.target.value)}
-              className="w-full bg-surface-container border border-surface-container-high rounded-lg px-3 py-3 font-label-caps text-label-caps text-on-surface focus:outline-none focus:border-primary"
-            >
-              {sessions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.dateStr} ({s.status})
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Session Date & Match Number Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+          {/* Custom Stitch Calendar Date Picker */}
+          <CalendarDatePicker
+            value={selectedDate}
+            onChange={handleDateChange}
+            label="SESSION DATE"
+          />
 
           <div className="flex flex-col gap-base">
             <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">

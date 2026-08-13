@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { getUtcDayBounds, parseYMDToUtcNoon, getTodayYMD } from "@/lib/utils/dates";
 
 export async function getSessionById(id: string) {
   return await prisma.gamingSession.findUnique({
@@ -42,9 +43,11 @@ export async function getAllSessions() {
 }
 
 export async function createSession(date?: Date) {
+  const targetDate = date ? parseYMDToUtcNoon(date.toISOString().split("T")[0]) : parseYMDToUtcNoon(getTodayYMD());
+
   return await prisma.gamingSession.create({
     data: {
-      date: date || new Date(),
+      date: targetDate,
       status: "DRAFT",
     },
     select: {
@@ -84,7 +87,7 @@ export async function getOrCreateActiveDraftSession() {
 
   return await prisma.gamingSession.create({
     data: {
-      date: new Date(),
+      date: parseYMDToUtcNoon(getTodayYMD()),
       status: "DRAFT",
     },
     select: {
@@ -141,4 +144,65 @@ export async function publishSession(id: string) {
     },
   });
 }
+
+export async function getOrCreateSessionForDate(dateIsoString: string) {
+  const { startOfDay, endOfDay, utcNoon } = getUtcDayBounds(dateIsoString);
+
+  const existing = await prisma.gamingSession.findFirst({
+    where: {
+      date: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+    },
+    select: {
+      id: true,
+      date: true,
+      status: true,
+      matches: {
+        select: {
+          id: true,
+          matchNumber: true,
+          kills: true,
+          placement: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+        },
+        orderBy: { matchNumber: "asc" },
+      },
+    },
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  return await prisma.gamingSession.create({
+    data: {
+      date: utcNoon,
+      status: "DRAFT",
+    },
+    select: {
+      id: true,
+      date: true,
+      status: true,
+      matches: {
+        select: {
+          id: true,
+          matchNumber: true,
+          kills: true,
+          placement: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+        },
+        orderBy: { matchNumber: "asc" },
+      },
+    },
+  });
+}
+
+
+
 
