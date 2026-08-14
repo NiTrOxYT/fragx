@@ -1,17 +1,41 @@
 import Link from "next/link";
-import { getMVP, getGoldenGunAward, getSessionSummary, getRecentMatches } from "@/lib/services/stats";
+import {
+  getLatestPublishedSession,
+
+  getMVP,
+  getGoldenGunAward,
+  getSessionSummary,
+  getRecentMatches,
+} from "@/lib/services/stats";
 import GoldenGunAward from "@/components/common/GoldenGunAward";
 import EmptyState from "@/components/common/EmptyState";
 
 export const revalidate = 60; // 60-second ISR for fast public page delivery
 
 export default async function HomePage() {
+  const latestSession = await getLatestPublishedSession();
+
+  if (!latestSession) {
+    return (
+      <main className="pt-header-safe md:pt-24 px-safe-margin max-w-7xl mx-auto space-y-stack-lg flex flex-col items-center w-full pb-[100px] md:pb-12">
+        <div className="w-full max-w-3xl">
+          <EmptyState
+            icon="emoji_events"
+            title="Tonight's Battlefield Awaits"
+            description="No published gaming sessions yet. Admin needs to log and publish tonight's BGMI match results."
+          />
+        </div>
+      </main>
+    );
+  }
+
   const [mvpData, goldenGunData, summary, recentMatches] = await Promise.all([
-    getMVP(),
-    getGoldenGunAward(),
-    getSessionSummary(),
-    getRecentMatches(5),
+    getMVP(latestSession.id),
+    getGoldenGunAward(latestSession.id),
+    getSessionSummary(latestSession.id),
+    getRecentMatches(latestSession.id, 5),
   ]);
+
 
   const mainMvp = mvpData?.players[0];
 

@@ -31,10 +31,11 @@ export const getLatestPublishedSession = cache(async () => {
     },
 
     orderBy: [
-      { publishedAt: "desc" },
       { date: "desc" },
+      { publishedAt: "desc" },
       { createdAt: "desc" },
     ],
+
     select: {
       id: true,
       date: true,
@@ -79,10 +80,11 @@ export const getLatestPublishedSession = cache(async () => {
   return await (prisma.gamingSession as any).findFirst({
     where: { status: "PUBLISHED" },
     orderBy: [
-      { publishedAt: "desc" },
       { date: "desc" },
+      { publishedAt: "desc" },
       { createdAt: "desc" },
     ],
+
     select: {
       id: true,
       date: true,
@@ -435,16 +437,24 @@ export const getSessionSummary = cache(async (sessionId?: string) => {
 });
 
 
-export const getRecentMatches = cache(async (limit = 10) => {
+export const getRecentMatches = cache(async (sessionId?: string, limit = 10) => {
+  let targetSessionId = sessionId;
+  if (!targetSessionId) {
+    const latest = await getLatestPublishedSession();
+    if (!latest) return [];
+    targetSessionId = latest.id;
+  }
 
   const matches = await (prisma.match as any).findMany({
     where: {
+      sessionId: targetSessionId,
       session: {
         status: "PUBLISHED",
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ matchNumber: "desc" }, { createdAt: "desc" }],
     take: limit,
+
     select: {
       id: true,
       matchNumber: true,
