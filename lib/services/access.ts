@@ -10,37 +10,64 @@ const ACCESS_COOKIE_NAME = "fragx_access_session";
  * 1. Master Access Key (ACCESS_KEY environment variable)
  * 2. Any active Player's unique Access Key in database
  */
-export async function verifyAccessAuth(): Promise<boolean> {
+/**
+ * Retrieves the currently authenticated player/user from access session cookie.
+ */
+export async function getAuthenticatedPlayer(): Promise<{
+  id: string;
+  name: string;
+  role: string;
+  avatarUrl: string;
+  isAdmin: boolean;
+} | null> {
   const cookieStore = cookies();
   const sessionToken = cookieStore.get(ACCESS_COOKIE_NAME)?.value;
 
-  if (!sessionToken) {
-    return false;
-  }
+  if (!sessionToken) return null;
 
   const masterKey = process.env.ACCESS_KEY || "FRAGX2026";
   const masterToken = cryptoNative(masterKey);
 
-  // Check if session token matches master key
   if (sessionToken === masterToken) {
-    return true;
+    const adminPlayer = await (prisma.player as any).findFirst({
+      where: { role: "ADMIN", isActive: true },
+      select: { id: true, name: true, role: true, avatarUrl: true },
+    });
+    if (adminPlayer) {
+      return { ...adminPlayer, isAdmin: true };
+    }
+    return { id: "master", name: "ADMIN", role: "ADMIN", avatarUrl: "", isAdmin: true };
   }
 
-  // Check if session token matches an active player's access key hash
   try {
     const player = await (prisma.player as any).findFirst({
       where: {
         accessKeyHash: sessionToken,
         isActive: true,
       },
-      select: { id: true },
+      select: { id: true, name: true, role: true, avatarUrl: true },
     });
-    return !!player;
+    if (player) {
+      return {
+        ...player,
+        isAdmin: player.role === "ADMIN",
+      };
+    }
   } catch (err) {
-    console.error("Error verifying player access auth:", err);
-    return false;
+    console.error("Error fetching authenticated player:", err);
   }
+
+  return null;
 }
+
+/**
+ * Verifies whether the current request has a valid access token cookie.
+ */
+export async function verifyAccessAuth(): Promise<boolean> {
+  const player = await getAuthenticatedPlayer();
+  return !!player;
+}
+
 
 /**
  * Validates the provided Access Key against Master Key or Player Access Keys.
