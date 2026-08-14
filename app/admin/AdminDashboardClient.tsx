@@ -15,6 +15,9 @@ export interface AdminPlayer {
   avatarUrl: string;
   role: "PLAYER" | "MODERATOR" | "ADMIN";
   isActive: boolean;
+  goldenGunCount?: number;
+  totalKills?: number;
+  matchesCount?: number;
 }
 
 export interface AdminTeamPlayer {
@@ -84,7 +87,6 @@ export default function AdminDashboardClient({
   // Management section active tab: "MATCHES" | "PLAYERS" | "TEAMS" | "GOLDEN_GUN"
   const [activeTab, setActiveTab] = useState<"MATCHES" | "PLAYERS" | "TEAMS" | "GOLDEN_GUN">("MATCHES");
 
-
   // Matches management state
   const [matches, setMatches] = useState<AdminMatchItem[]>(initialMatches);
   const [matchToDelete, setMatchToDelete] = useState<AdminMatchItem | null>(null);
@@ -100,6 +102,12 @@ export default function AdminDashboardClient({
   const [playerActionMsg, setPlayerActionMsg] = useState("");
   const [loadingPlayerId, setLoadingPlayerId] = useState<string | null>(null);
 
+  // Edit Golden Gun Count Modal state
+  const [editingGoldenGunPlayer, setEditingGoldenGunPlayer] = useState<AdminPlayer | null>(null);
+  const [newGoldenGunCount, setNewGoldenGunCount] = useState<number>(0);
+  const [isSavingGoldenGun, setIsSavingGoldenGun] = useState(false);
+  const [goldenGunEditError, setGoldenGunEditError] = useState("");
+
   // Edit Player Modal state
   const [editingPlayer, setEditingPlayer] = useState<AdminPlayer | null>(null);
   const [editName, setEditName] = useState("");
@@ -110,6 +118,7 @@ export default function AdminDashboardClient({
   const [editImageError, setEditImageError] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editErrorMsg, setEditErrorMsg] = useState("");
+
 
   // Team management state
   const [teams, setTeams] = useState<AdminTeam[]>(initialTeams);
@@ -234,6 +243,57 @@ export default function AdminDashboardClient({
     }
   };
 
+  // Open Edit Golden Gun Count Modal
+  const handleOpenEditGoldenGun = (player: AdminPlayer) => {
+    setEditingGoldenGunPlayer(player);
+    setNewGoldenGunCount(player.goldenGunCount || 0);
+    setGoldenGunEditError("");
+  };
+
+  // Save Edit Golden Gun Count
+  const handleSaveGoldenGunCount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingGoldenGunPlayer) return;
+
+    if (!Number.isInteger(newGoldenGunCount) || newGoldenGunCount < 0) {
+      setGoldenGunEditError("Golden Gun count must be a non-negative integer");
+      return;
+    }
+
+    setIsSavingGoldenGun(true);
+    setGoldenGunEditError("");
+
+    try {
+      const res = await fetch(`/api/players/${editingGoldenGunPlayer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goldenGunCount: newGoldenGunCount }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setPlayers((prev) =>
+          prev.map((p) =>
+            p.id === editingGoldenGunPlayer.id
+              ? { ...p, goldenGunCount: newGoldenGunCount }
+              : p
+          )
+        );
+        setPlayerActionMsg(
+          `🏆 Golden Gun count for ${editingGoldenGunPlayer.name} updated to ${newGoldenGunCount}.`
+        );
+        setEditingGoldenGunPlayer(null);
+        router.refresh();
+      } else {
+        setGoldenGunEditError(data.error || "Failed to update Golden Gun count");
+      }
+    } catch (err: any) {
+      setGoldenGunEditError(err?.message || "Error updating Golden Gun count");
+    } finally {
+      setIsSavingGoldenGun(false);
+    }
+  };
+
   // Open Edit Player Modal
   const handleOpenEditModal = (player: AdminPlayer) => {
     setEditingPlayer(player);
@@ -245,6 +305,7 @@ export default function AdminDashboardClient({
     setEditImageError(false);
     setEditErrorMsg("");
   };
+
 
   // Save Edit Player
   const handleSaveEditPlayer = async (e: React.FormEvent) => {
@@ -1287,7 +1348,7 @@ export default function AdminDashboardClient({
           )}
 
           {/* Player Roster Cards */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             {players.length > 0 ? (
               players.map((p) => {
                 const isAdmin = p.role === "ADMIN";
@@ -1296,95 +1357,155 @@ export default function AdminDashboardClient({
                 return (
                   <div
                     key={p.id}
-                    className={`glass-panel rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 border transition-colors ${
-                      !p.isActive ? "opacity-50 bg-surface-container/30" : "hover:border-primary/40"
+                    className={`glass-panel rounded-2xl p-5 flex flex-col gap-4 border transition-colors ${
+                      !p.isActive
+                        ? "opacity-60 bg-surface-container/30 border-surface-container-high"
+                        : "hover:border-primary/40 border-surface-container-high"
                     }`}
                   >
-                    {/* Player Info */}
-                    <div className="flex items-center gap-4 w-full sm:w-auto">
-                      <div className="w-12 h-12 rounded-full border border-primary/30 overflow-hidden relative flex-shrink-0 bg-surface-container flex items-center justify-center">
-                        <img
-                          src={p.avatarUrl}
-                          alt={p.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-headline text-headline-sm text-on-surface">
-                            {p.name}
-                          </h4>
-
-                          <span
-                            className={`font-label-caps text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                              isAdmin
-                                ? "bg-[#D4AF37]/20 text-gold border border-[#D4AF37]/40"
-                                : isMod
-                                ? "bg-primary/20 text-primary border border-primary/40"
-                                : "bg-surface-container-high text-on-surface-variant border border-surface-variant"
-                            }`}
-                          >
-                            {p.role}
-                          </span>
+                    {/* Top Row: Avatar + Gamertag + Role + Status */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-xl border border-primary/30 overflow-hidden relative flex-shrink-0 bg-surface-container flex items-center justify-center shadow-md">
+                          <img
+                            src={p.avatarUrl}
+                            alt={p.name}
+                            className="w-full h-full object-cover"
+                          />
                         </div>
 
-                        <span className="font-body text-xs text-on-surface-variant/70 block mt-0.5">
-                          Status: {p.isActive ? "Active Fragger" : "Inactive"}
-                        </span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-headline text-lg font-bold text-on-surface uppercase">
+                              {p.name}
+                            </h4>
+
+                            <span
+                              className={`font-label-caps text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                                isAdmin
+                                  ? "bg-[#D4AF37]/20 text-[#F5D76E] border border-[#D4AF37]/40"
+                                  : isMod
+                                  ? "bg-primary/20 text-primary border border-primary/40"
+                                  : "bg-surface-container-high text-on-surface-variant border border-surface-variant"
+                              }`}
+                            >
+                              {p.role}
+                            </span>
+                          </div>
+
+                          <span className="font-body text-xs text-on-surface-variant flex items-center gap-1.5 mt-0.5">
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                p.isActive ? "bg-emerald-400" : "bg-zinc-500"
+                              }`}
+                            />
+                            {p.isActive ? "ACTIVE" : "INACTIVE"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Quick Role & Active Actions */}
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        {/* Role Selector */}
+                        <select
+                          value={p.role}
+                          disabled={loadingPlayerId === p.id}
+                          onChange={(e) =>
+                            handleUpdatePlayer(p.id, {
+                              role: e.target.value as "PLAYER" | "MODERATOR" | "ADMIN",
+                            })
+                          }
+                          className="bg-surface-container border border-surface-container-high text-on-surface font-label-caps text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-primary"
+                        >
+                          <option value="PLAYER">PLAYER</option>
+                          <option value="MODERATOR">MODERATOR</option>
+                          <option value="ADMIN">ADMIN</option>
+                        </select>
+
+                        {/* Active Status Toggle */}
+                        <button
+                          onClick={() => handleUpdatePlayer(p.id, { isActive: !p.isActive })}
+                          disabled={loadingPlayerId === p.id}
+                          className={`font-label-caps text-xs px-3 py-1.5 rounded-lg border transition-colors font-bold ${
+                            p.isActive
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                              : "bg-surface-container text-on-surface-variant border-surface-variant hover:text-on-surface"
+                          }`}
+                        >
+                          {p.isActive ? "ACTIVE" : "INACTIVE"}
+                        </button>
+
+                        {/* Delete Action */}
+                        <button
+                          onClick={() => handleDeletePlayer(p.id, p.name)}
+                          disabled={loadingPlayerId === p.id}
+                          title="Delete Player"
+                          className="p-1.5 text-on-surface-variant hover:text-error transition-colors rounded-lg hover:bg-error/10"
+                        >
+                          <span className="material-symbols-outlined text-lg">delete</span>
+                        </button>
                       </div>
                     </div>
 
-                    {/* Role & Action Controls */}
-                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-surface-container-high">
-                      {/* EDIT Button */}
+                    {/* Divider */}
+                    <div className="h-px bg-surface-container-high/80 w-full" />
+
+                    {/* Middle Stats Bar: KILLS, MATCHES, GOLDEN GUN */}
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4 p-3 rounded-xl bg-surface-container/60 border border-surface-container-high items-center">
+                      {/* Kills */}
+                      <div className="flex flex-col items-center sm:items-start pl-1 sm:pl-2">
+                        <span className="font-label-caps text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
+                          KILLS
+                        </span>
+                        <span className="font-mono text-base sm:text-lg text-primary font-extrabold">
+                          {p.totalKills || 0}
+                        </span>
+                      </div>
+
+                      {/* Matches */}
+                      <div className="flex flex-col items-center sm:items-start border-x border-surface-container-high px-2">
+                        <span className="font-label-caps text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
+                          MATCHES
+                        </span>
+                        <span className="font-mono text-base sm:text-lg text-white font-extrabold">
+                          {p.matchesCount || 0}
+                        </span>
+                      </div>
+
+                      {/* Golden Gun with Edit Button */}
+                      <div className="flex items-center justify-between gap-2 pr-1 sm:pr-2">
+                        <div className="flex flex-col items-center sm:items-start">
+                          <span className="font-label-caps text-[10px] text-[#D4AF37] font-bold uppercase tracking-wider flex items-center gap-1">
+                            <span>GOLDEN GUN</span>
+                          </span>
+                          <span className="font-mono text-base sm:text-lg text-[#F5D76E] font-extrabold flex items-center gap-1">
+                            <span>🏆</span>
+                            <span>× {p.goldenGunCount || 0}</span>
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditGoldenGun(p)}
+                          className="px-2.5 py-1.5 rounded-lg bg-[#D4AF37]/15 border border-[#D4AF37]/40 hover:bg-[#D4AF37]/25 text-[#F5D76E] font-label-caps text-[11px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 shrink-0 shadow-sm"
+                          title="Edit Golden Gun Count"
+                        >
+                          <span className="material-symbols-outlined text-sm">edit</span>
+                          <span>EDIT</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bottom Row Actions */}
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-surface-container-high/60">
                       <button
                         onClick={() => handleOpenEditModal(p)}
                         disabled={loadingPlayerId === p.id}
-                        className="font-label-caps text-xs px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-high border border-primary/40 text-primary flex items-center gap-1 transition-colors font-bold"
-                        title="Edit Player Details"
+                        className="font-label-caps text-xs px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high border border-primary/40 text-primary flex items-center gap-1.5 transition-colors font-bold uppercase tracking-wider"
+                        title="Edit Player Profile Details"
                       >
                         <span className="material-symbols-outlined text-sm">edit</span>
-                        EDIT
-                      </button>
-
-                      {/* Role Selector */}
-                      <select
-                        value={p.role}
-                        disabled={loadingPlayerId === p.id}
-                        onChange={(e) =>
-                          handleUpdatePlayer(p.id, {
-                            role: e.target.value as "PLAYER" | "MODERATOR" | "ADMIN",
-                          })
-                        }
-                        className="bg-surface-container border border-surface-container-high text-on-surface font-label-caps text-xs px-2.5 py-1.5 rounded focus:outline-none focus:border-primary"
-                      >
-                        <option value="PLAYER">PLAYER</option>
-                        <option value="MODERATOR">MODERATOR</option>
-                        <option value="ADMIN">ADMIN</option>
-                      </select>
-
-                      {/* Active Status Toggle */}
-                      <button
-                        onClick={() => handleUpdatePlayer(p.id, { isActive: !p.isActive })}
-                        disabled={loadingPlayerId === p.id}
-                        className={`font-label-caps text-xs px-3 py-1.5 rounded border transition-colors ${
-                          p.isActive
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                            : "bg-surface-container text-on-surface-variant border-surface-variant hover:text-on-surface"
-                        }`}
-                      >
-                        {p.isActive ? "Active" : "Inactive"}
-                      </button>
-
-                      {/* Delete Action */}
-                      <button
-                        onClick={() => handleDeletePlayer(p.id, p.name)}
-                        disabled={loadingPlayerId === p.id}
-                        title="Delete Player"
-                        className="p-1.5 text-on-surface-variant hover:text-error transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-lg">delete</span>
+                        EDIT PROFILE
                       </button>
                     </div>
                   </div>
@@ -2030,7 +2151,110 @@ export default function AdminDashboardClient({
           </div>,
           document.body
         )}
+
+      {/* Edit Golden Gun Count Modal Portal */}
+      {editingGoldenGunPlayer &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+            <div className="w-full max-w-md bg-[#111111] border border-[#D4AF37]/50 rounded-2xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center border-b border-surface-container-high pb-3">
+                <div className="flex items-center gap-2 text-[#D4AF37]">
+                  <span className="text-2xl">🏆</span>
+                  <h3 className="font-headline text-base sm:text-lg font-bold text-white uppercase tracking-tight">
+                    EDIT GOLDEN GUN COUNT
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingGoldenGunPlayer(null)}
+                  className="text-on-surface-variant hover:text-white p-1 rounded-lg"
+                >
+                  <span className="material-symbols-outlined text-xl">close</span>
+                </button>
+              </div>
+
+              {goldenGunEditError && (
+                <div className="p-3 rounded-xl bg-error-container/20 border border-error/30 text-error font-label-caps text-xs flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base">warning</span>
+                  <span>{goldenGunEditError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveGoldenGunCount} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="font-label-caps text-xs text-on-surface-variant uppercase font-bold block">
+                    PLAYER
+                  </label>
+                  <div className="w-full bg-[#161616] border border-surface-container-high rounded-xl px-4 py-2.5 font-headline font-bold text-white flex items-center gap-2.5">
+                    <img
+                      src={editingGoldenGunPlayer.avatarUrl}
+                      alt={editingGoldenGunPlayer.name}
+                      className="w-7 h-7 rounded-lg object-cover border border-surface-container-high"
+                    />
+                    <span>{editingGoldenGunPlayer.name}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-label-caps text-xs text-on-surface-variant uppercase font-bold block">
+                      CURRENT COUNT
+                    </label>
+                    <div className="w-full bg-[#161616] border border-surface-container-high rounded-xl px-4 py-2.5 font-mono text-sm text-on-surface-variant">
+                      🏆 {editingGoldenGunPlayer.goldenGunCount || 0}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-label-caps text-xs text-[#D4AF37] uppercase font-bold block">
+                      NEW COUNT
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      required
+                      value={newGoldenGunCount}
+                      onChange={(e) =>
+                        setNewGoldenGunCount(
+                          e.target.value === "" ? 0 : parseInt(e.target.value, 10)
+                        )
+                      }
+                      className="w-full bg-[#161616] border border-[#D4AF37]/60 rounded-xl px-4 py-2.5 font-mono text-base font-bold text-[#F5D76E] focus:outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-surface-container-high">
+                  <button
+                    type="button"
+                    onClick={() => setEditingGoldenGunPlayer(null)}
+                    disabled={isSavingGoldenGun}
+                    className="px-4 py-2 rounded-xl border border-surface-container-high text-on-surface-variant hover:text-white font-label-caps text-xs font-bold uppercase tracking-wider"
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingGoldenGun}
+                    className="px-5 py-2 rounded-xl bg-[#D4AF37] hover:bg-[#e0bb3e] text-black font-label-caps text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-[0_0_15px_rgba(212,175,55,0.3)]"
+                  >
+                    {isSavingGoldenGun && (
+                      <span className="material-symbols-outlined text-sm animate-spin">
+                        progress_activity
+                      </span>
+                    )}
+                    SAVE COUNT
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
     </main>
   );
 }
+
 

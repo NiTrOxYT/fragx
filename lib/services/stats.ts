@@ -623,12 +623,25 @@ const getGoldenGunCountsInternal = async (): Promise<{ [playerId: string]: numbe
     }
 
     if (maxSessionKills > 0) {
-      for (const [pId, kills] of Object.entries(sessionPlayerKills)) {
-        if (kills === maxSessionKills) {
-          goldenGunCounts[pId] = (goldenGunCounts[pId] || 0) + 1;
-        }
+      const topFraggers = Object.entries(sessionPlayerKills).filter(
+        ([_, kills]) => kills === maxSessionKills
+      );
+      if (topFraggers.length === 1) {
+        const pId = topFraggers[0][0];
+        goldenGunCounts[pId] = (goldenGunCounts[pId] || 0) + 1;
       }
     }
+  }
+
+  // Apply player manual adjustments
+  const players = await (prisma.player as any).findMany({
+    select: { id: true, goldenGunAdjustment: true },
+  });
+
+  for (const p of players) {
+    const raw = goldenGunCounts[p.id] || 0;
+    const adjusted = Math.max(0, raw + (p.goldenGunAdjustment || 0));
+    goldenGunCounts[p.id] = adjusted;
   }
 
   return goldenGunCounts;
@@ -637,8 +650,9 @@ const getGoldenGunCountsInternal = async (): Promise<{ [playerId: string]: numbe
 export const getGoldenGunCounts = unstable_cache(
   getGoldenGunCountsInternal,
   ["golden-gun-counts"],
-  { revalidate: 60, tags: ["stats", "matches", "sessions"] }
+  { revalidate: 60, tags: ["stats", "matches", "sessions", "golden-gun", "players"] }
 );
+
 
 const getLeaderboardInternal = async (filter: "ALL TIME" | "THIS MONTH" | "THIS WEEK" = "ALL TIME") => {
   const now = new Date();

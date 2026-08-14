@@ -248,6 +248,148 @@ export async function deletePlayer(id: string) {
   });
 }
 
+/**
+ * Updates a player's cumulative Golden Gun count by calculating the adjustment from raw awards.
+ */
+export async function updatePlayerGoldenGunCount(playerId: string, targetCount: number) {
+  if (!Number.isInteger(targetCount) || targetCount < 0) {
+    throw new Error("Golden Gun count must be a non-negative integer");
+  }
+
+  // 1. Calculate raw awards count for this player across all published sessions
+  const publishedSessions = await (prisma.gamingSession as any).findMany({
+    where: { status: "PUBLISHED" },
+    select: {
+      id: true,
+      goldenGunAward: { select: { playerId: true } },
+      matches: {
+        select: {
+          id: true,
+          kills: true,
+          playerId: true,
+          matchTeams: {
+            select: {
+              players: { select: { playerId: true, kills: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  let rawAwardsCount = 0;
+  for (const session of publishedSessions) {
+    if (session.goldenGunAward?.playerId) {
+      if (session.goldenGunAward.playerId === playerId) {
+        rawAwardsCount += 1;
+      }
+      continue;
+    }
+
+    if (!session.matches || session.matches.length === 0) continue;
+    const sessionPlayerKills: { [id: string]: number } = {};
+    for (const match of session.matches) {
+      if (match.matchTeams && match.matchTeams.length > 0) {
+        for (const mt of match.matchTeams) {
+          for (const mp of mt.players || []) {
+            sessionPlayerKills[mp.playerId] = (sessionPlayerKills[mp.playerId] || 0) + (mp.kills || 0);
+          }
+        }
+      } else if (match.playerId) {
+        sessionPlayerKills[match.playerId] = (sessionPlayerKills[match.playerId] || 0) + (match.kills || 0);
+      }
+    }
+
+    let maxSessionKills = 0;
+    for (const kills of Object.values(sessionPlayerKills)) {
+      if (kills > maxSessionKills) maxSessionKills = kills;
+    }
+
+    if (maxSessionKills > 0) {
+      const topFraggers = Object.entries(sessionPlayerKills).filter(([_, k]) => k === maxSessionKills);
+      if (topFraggers.length === 1 && topFraggers[0][0] === playerId) {
+        rawAwardsCount += 1;
+      }
+    }
+  }
+
+  const adjustment = targetCount - rawAwardsCount;
+
+  return await (prisma.player as any).update({
+    where: { id: playerId },
+    data: { goldenGunAdjustment: adjustment },
+    select: {
+      id: true,
+      name: true,
+      avatarUrl: true,
+      role: true,
+      isActive: true,
+      goldenGunAdjustment: true,
+    },
+  });
+}
+
+/**
+ * Returns players with cumulative kills, matches, and Golden Gun counts for Admin panel.
+ */
+export async function getAdminPlayersList() {
+  const [players, goldenGunCounts, legacyMatches, multiTeamMatchPlayers] = await Promise.all([
+    (prisma.player as any).findMany({
+      select: {
+        id: true,
+        name: true,
+        avatarUrl: true,
+        role: true,
+        isActive: true,
+        goldenGunAdjustment: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+    getGoldenGunCounts(),
+    (prisma.match as any).findMany({
+      where: { session: { status: "PUBLISHED" } },
+      select: { playerId: true, kills: true },
+    }),
+    (prisma as any).matchPlayer.findMany({
+      where: { matchTeam: { match: { session: { status: "PUBLISHED" } } } },
+      select: { playerId: true, kills: true },
+    }),
+  ]);
+
+  const statsMap = new Map<string, { kills: number; matches: number }>();
+  for (const p of players) {
+    statsMap.set(p.id, { kills: 0, matches: 0 });
+  }
+
+  for (const m of legacyMatches) {
+    if (m.playerId && statsMap.has(m.playerId)) {
+      const s = statsMap.get(m.playerId)!;
+      s.kills += m.kills || 0;
+      s.matches += 1;
+    }
+  }
+
+  for (const mp of multiTeamMatchPlayers) {
+    if (mp.playerId && statsMap.has(mp.playerId)) {
+      const s = statsMap.get(mp.playerId)!;
+      s.kills += mp.kills || 0;
+      s.matches += 1;
+    }
+  }
+
+  return players.map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    avatarUrl: p.avatarUrl,
+    role: p.role,
+    isActive: p.isActive,
+    goldenGunCount: goldenGunCounts[p.id] || 0,
+    totalKills: statsMap.get(p.id)?.kills || 0,
+    matchesCount: statsMap.get(p.id)?.matches || 0,
+  }));
+}
+
+
 
 
 

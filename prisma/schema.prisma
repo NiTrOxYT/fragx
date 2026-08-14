@@ -24,11 +24,12 @@ model Player {
   isActive      Boolean       @default(true)
   teamId        String?
   team          Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  matches       Match[]
-  matchPlayers  MatchPlayer[]
-  goldenGunAwards GoldenGunAward[]
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  goldenGunAdjustment Int             @default(0)
+  matches             Match[]
+  matchPlayers        MatchPlayer[]
+  goldenGunAwards     GoldenGunAward[]
 
   @@index([teamId])
 }

@@ -12,6 +12,11 @@ const updatePlayerSchema = z.object({
   role: z.enum(["PLAYER", "MODERATOR", "ADMIN"]).optional(),
   isActive: z.boolean().optional(),
   secretKey: z.string().optional(),
+  goldenGunCount: z
+    .number()
+    .int("Golden Gun count must be an integer")
+    .min(0, "Golden Gun count must be 0 or greater")
+    .optional(),
 });
 
 export async function PATCH(
@@ -48,7 +53,13 @@ export async function PATCH(
     // Role-based field restrictions:
     // 1. Regular Player editing own profile -> Avatar URL ONLY
     if (!isAdmin && !isModerator && isOwner) {
-      if (parsed.name || parsed.role || parsed.isActive || parsed.secretKey) {
+      if (
+        parsed.name ||
+        parsed.role ||
+        parsed.isActive ||
+        parsed.secretKey ||
+        parsed.goldenGunCount !== undefined
+      ) {
         return NextResponse.json(
           { error: "Players can only update their own profile picture" },
           { status: 403 }
@@ -65,14 +76,12 @@ export async function PATCH(
         );
       }
       if ((targetPlayer.role as string) === "ADMIN" && parsed.role && (parsed.role as string) !== "ADMIN") {
-
         return NextResponse.json(
           { error: "Moderators are not allowed to demote Administrators" },
           { status: 403 }
         );
       }
     }
-
 
     // 3. Admin demoting an ADMIN -> Prevent removing the last administrator
     if (isAdmin && targetPlayer.role === "ADMIN" && parsed.role && parsed.role !== "ADMIN") {
@@ -87,7 +96,16 @@ export async function PATCH(
       }
     }
 
-    const updated = await updatePlayer(params.id, parsed);
+    // 4. Update goldenGunCount if requested
+    if (parsed.goldenGunCount !== undefined) {
+      const { updatePlayerGoldenGunCount } = await import("@/lib/services/players");
+      await updatePlayerGoldenGunCount(params.id, parsed.goldenGunCount);
+    }
+
+    const { goldenGunCount, ...restUpdates } = parsed;
+    const updated = Object.keys(restUpdates).length > 0
+      ? await updatePlayer(params.id, restUpdates)
+      : targetPlayer;
 
     const { revalidateTag } = await import("next/cache");
     revalidatePath(`/players/${params.id}`);
@@ -99,9 +117,11 @@ export async function PATCH(
     revalidateTag("players");
     revalidateTag("stats");
     revalidateTag("leaderboard");
+    revalidateTag("golden-gun");
     revalidateTag(`player-${params.id}`);
 
     return NextResponse.json({ player: updated });
+
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || "Failed to update player" },

@@ -2,7 +2,7 @@ import { verifyAdminAuth } from "@/lib/services/admin";
 import { getMVP, getSessionSummary } from "@/lib/services/stats";
 import { getOrCreateActiveDraftSession } from "@/lib/services/sessions";
 import { getAllAdminMatches } from "@/lib/services/matches";
-import { getAllPlayers } from "@/lib/services/players";
+import { getAdminPlayersList } from "@/lib/services/players";
 import { getAllTeams } from "@/lib/services/teams";
 import {
   getSessionGoldenGunDetails,
@@ -29,7 +29,7 @@ export default async function AdminDashboardPage() {
     getSessionSummary(),
     getMVP(),
     getAllAdminMatches(),
-    getAllPlayers(),
+    getAdminPlayersList(),
     getAllTeams(),
     getSessionGoldenGunDetails(),
     getAdminGoldenGunSessions(),
@@ -43,13 +43,7 @@ export default async function AdminDashboardPage() {
       activeDraftId={activeDraft.id}
       draftMatchCount={activeDraft.matches.length}
       initialMatches={allMatches}
-      initialPlayers={players.map((p) => ({
-        id: p.id,
-        name: p.name,
-        avatarUrl: p.avatarUrl,
-        role: (p.role || "PLAYER") as "PLAYER" | "MODERATOR" | "ADMIN",
-        isActive: p.isActive !== false,
-      }))}
+      initialPlayers={players}
       initialTeams={teams.map((t) => ({
         id: t.id,
         name: t.name,
@@ -60,6 +54,7 @@ export default async function AdminDashboardPage() {
       }))}
       initialGoldenGun={initialGoldenGun}
       initialGoldenGunSessions={goldenGunSessions}
+
       stats={{
         totalMatches: summary.matchCount,
         totalKills: summary.totalKills,
