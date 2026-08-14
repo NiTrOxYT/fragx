@@ -1,14 +1,13 @@
 import Link from "next/link";
 import {
   getLatestPublishedSession,
+
   getMVP,
   getGoldenGunAward,
   getSessionSummary,
   getRecentMatches,
-  getScoreboardData,
 } from "@/lib/services/stats";
 import GoldenGunAward from "@/components/common/GoldenGunAward";
-import TeamScoreboard from "@/components/common/TeamScoreboard";
 import EmptyState from "@/components/common/EmptyState";
 
 export const revalidate = 60; // 60-second ISR for fast public page delivery
@@ -30,21 +29,18 @@ export default async function HomePage() {
     );
   }
 
-  const [mvpData, goldenGunData, summary, recentMatches, scoreboardData] = await Promise.all([
+  const [mvpData, goldenGunData, summary, recentMatches] = await Promise.all([
     getMVP(latestSession.id),
     getGoldenGunAward(latestSession.id),
     getSessionSummary(latestSession.id),
     getRecentMatches(latestSession.id, 5),
-    getScoreboardData(),
   ]);
-
 
   const mainMvp = mvpData?.players[0];
 
   return (
     <main className="pt-header-safe md:pt-24 px-safe-margin max-w-7xl mx-auto space-y-stack-lg flex flex-col items-center w-full pb-[100px] md:pb-12">
-      {/* Team Scoreboard Banner */}
-      {scoreboardData && <TeamScoreboard data={scoreboardData} />}
+
 
       {/* Hero Section: MVP */}
       {mainMvp ? (

@@ -56,6 +56,14 @@ export default function TopHeader() {
             Home
           </Link>
           <Link
+            href="/scoreboard"
+            className={`font-label-caps text-label-caps tracking-widest uppercase transition-colors h-full flex items-center border-b-2 ${
+              pathname.startsWith("/scoreboard") ? "text-primary border-primary" : "text-on-surface-variant hover:text-primary/80 border-transparent"
+            }`}
+          >
+            Scoreboard
+          </Link>
+          <Link
             href="/matches"
             className={`font-label-caps text-label-caps tracking-widest uppercase transition-colors h-full flex items-center border-b-2 ${
               pathname.startsWith("/matches") ? "text-primary border-primary" : "text-on-surface-variant hover:text-primary/80 border-transparent"
@@ -63,6 +71,7 @@ export default function TopHeader() {
           >
             Matches
           </Link>
+
           <Link
             href="/leaderboard"
             className={`font-label-caps text-label-caps tracking-widest uppercase transition-colors h-full flex items-center border-b-2 ${

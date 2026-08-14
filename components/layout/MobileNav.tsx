@@ -17,9 +17,11 @@ export default function MobileNav() {
 
   const items = [
     { label: "Home", href: "/", icon: "home" },
+    { label: "Scoreboard", href: "/scoreboard", icon: "military_tech" },
     { label: "Matches", href: "/matches", icon: "sports_esports" },
     { label: "Leaderboard", href: "/leaderboard", icon: "leaderboard" },
   ];
+
 
 
   return (
