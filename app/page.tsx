@@ -54,9 +54,10 @@ export default async function HomePage() {
               </h2>
               
               <GoldenGunAward
-                peakKills={goldenGunData?.peakKills || 0}
+                totalKills={goldenGunData?.totalKills || 0}
                 winners={goldenGunData?.winners || []}
               />
+
               
               <p className="font-body text-body-md text-on-surface-variant max-w-md">
                 Top fragger from last night's session. Unstoppable momentum.

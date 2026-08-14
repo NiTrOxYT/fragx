@@ -57,7 +57,8 @@ export default async function ReviewSessionPage({ params }: ReviewSessionPagePro
 
   const totalKills = mappedMatches.reduce((acc, m) => acc + m.kills, 0);
   const goldenGunNames = goldenGunData?.winners.map((w) => w.name).join(" & ") || "None";
-  const goldenGunKills = goldenGunData?.peakKills || 0;
+  const goldenGunKills = goldenGunData?.totalKills || 0;
+
 
   return (
     <SessionReviewClient

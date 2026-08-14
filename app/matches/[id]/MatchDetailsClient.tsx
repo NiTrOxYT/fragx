@@ -30,13 +30,13 @@ interface MatchDetailsClientProps {
     matchTeams?: MatchTeamDetail[];
   };
   goldenGunPlayerIds?: string[];
-  goldenGunPeakKills?: number;
+  goldenGunTotalKills?: number;
 }
 
 export default function MatchDetailsClient({
   match,
   goldenGunPlayerIds = [],
-  goldenGunPeakKills = 0,
+  goldenGunTotalKills = 0,
 }: MatchDetailsClientProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -152,9 +152,9 @@ export default function MatchDetailsClient({
                   <div className="space-y-2">
                     {team.players.map((p) => {
                       const isGoldenGun =
-                        goldenGunPeakKills > 0 &&
-                        p.kills === goldenGunPeakKills &&
+                        goldenGunTotalKills > 0 &&
                         goldenGunPlayerIds.includes(p.id);
+
 
                       return (
                         <div

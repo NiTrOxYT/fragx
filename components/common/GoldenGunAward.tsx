@@ -7,19 +7,21 @@ export interface GoldenGunWinner {
 }
 
 interface GoldenGunAwardProps {
-  peakKills: number;
+  totalKills?: number;
+  peakKills?: number;
   winners?: GoldenGunWinner[];
   winnerName?: string;
   className?: string;
 }
 
 export default function GoldenGunAward({
+  totalKills,
   peakKills,
   winners = [],
   winnerName,
   className = "",
 }: GoldenGunAwardProps) {
-  // Backwards compatibility
+  const displayKills = totalKills ?? peakKills ?? 0;
   const activeWinners =
     winners.length > 0
       ? winners
@@ -27,7 +29,7 @@ export default function GoldenGunAward({
       ? [{ id: "legacy", name: winnerName }]
       : [];
 
-  const hasWinners = activeWinners.length > 0 && peakKills > 0;
+  const hasWinners = activeWinners.length > 0 && displayKills > 0;
 
   return (
     <div
@@ -60,10 +62,10 @@ export default function GoldenGunAward({
         {hasWinners ? (
           <>
             <span className="font-stat-value text-stat-value text-gold block font-mono font-bold">
-              {peakKills} KILLS
+              {displayKills} KILLS
             </span>
             <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">
-              HIGHEST SINGLE MATCH
+              TOTAL SESSION KILLS
             </span>
           </>
         ) : (

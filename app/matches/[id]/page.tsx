@@ -35,7 +35,7 @@ export default async function MatchDetailsPage({ params }: MatchDetailsPageProps
   })) || [];
 
   const goldenGunPlayerIds = goldenGunData?.winners.map((w) => w.id) || [];
-  const goldenGunPeakKills = goldenGunData?.peakKills || 0;
+  const goldenGunTotalKills = goldenGunData?.totalKills || 0;
 
   return (
     <MatchDetailsClient
@@ -51,7 +51,8 @@ export default async function MatchDetailsPage({ params }: MatchDetailsPageProps
         matchTeams,
       }}
       goldenGunPlayerIds={goldenGunPlayerIds}
-      goldenGunPeakKills={goldenGunPeakKills}
+      goldenGunTotalKills={goldenGunTotalKills}
     />
   );
+
 }

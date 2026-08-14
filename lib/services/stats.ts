@@ -17,13 +17,70 @@ export interface GoldenGunAwardResult {
     name: string;
     avatarUrl: string;
   }[];
-  peakKills: number;
+  totalKills: number;
 }
 
 export async function getLatestPublishedSession() {
+  const sessionWithMatches = await (prisma.gamingSession as any).findFirst({
+    where: {
+      status: "PUBLISHED",
+      matches: {
+        some: {},
+      },
+    },
+    orderBy: [
+      { publishedAt: "desc" },
+      { date: "desc" },
+      { createdAt: "desc" },
+    ],
+    select: {
+      id: true,
+      date: true,
+      status: true,
+      matches: {
+        select: {
+          id: true,
+          matchNumber: true,
+          kills: true,
+          placement: true,
+          playerId: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+          matchTeams: {
+            select: {
+              id: true,
+              placement: true,
+              team: {
+                select: { id: true, name: true },
+              },
+              players: {
+                select: {
+                  kills: true,
+                  player: {
+                    select: { id: true, name: true, avatarUrl: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { matchNumber: "asc" },
+      },
+    },
+  });
+
+  if (sessionWithMatches) {
+    return sessionWithMatches;
+  }
+
   return await (prisma.gamingSession as any).findFirst({
     where: { status: "PUBLISHED" },
-    orderBy: { date: "desc" },
+    orderBy: [
+      { publishedAt: "desc" },
+      { date: "desc" },
+      { createdAt: "desc" },
+    ],
     select: {
       id: true,
       date: true,
@@ -63,8 +120,8 @@ export async function getLatestPublishedSession() {
 }
 
 /**
- * Calculates Golden Gun Award: Highest SINGLE-MATCH individual kill count in the session.
- * Handles ties by returning all players who achieved that max single-match kill count.
+ * Calculates Golden Gun Award: Highest CUMULATIVE TOTAL KILLS across the ENTIRE Gaming Session.
+ * Handles ties by returning all players who achieved that max total session kills.
  */
 export async function getGoldenGunAward(sessionId?: string): Promise<GoldenGunAwardResult | null> {
   let session;
@@ -106,59 +163,68 @@ export async function getGoldenGunAward(sessionId?: string): Promise<GoldenGunAw
     return null;
   }
 
-  let maxSingleMatchKills = 0;
-
-  // Pass 1: Find maximum single-match individual kill count
-  for (const match of session.matches) {
-    if (match.matchTeams && match.matchTeams.length > 0) {
-      for (const mt of match.matchTeams) {
-        for (const mp of mt.players) {
-          if (mp.kills > maxSingleMatchKills) {
-            maxSingleMatchKills = mp.kills;
-          }
-        }
-      }
-    } else if (match.playerId && match.kills) {
-      if (match.kills > maxSingleMatchKills) {
-        maxSingleMatchKills = match.kills;
-      }
-    }
-  }
-
-  if (maxSingleMatchKills === 0) {
-    return { winners: [], peakKills: 0 };
-  }
-
-  // Pass 2: Collect all unique players who achieved maxSingleMatchKills in any match
-  const winnersMap = new Map<string, { id: string; name: string; avatarUrl: string }>();
+  // Aggregate total kills across all matches in the session per player
+  const playerKillsMap = new Map<
+    string,
+    { id: string; name: string; avatarUrl: string; totalKills: number }
+  >();
 
   for (const match of session.matches) {
     if (match.matchTeams && match.matchTeams.length > 0) {
       for (const mt of match.matchTeams) {
         for (const mp of mt.players) {
-          if (mp.kills === maxSingleMatchKills) {
-            winnersMap.set(mp.player.id, {
-              id: mp.player.id,
-              name: mp.player.name,
-              avatarUrl: mp.player.avatarUrl,
-            });
-          }
+          const pId = mp.player.id;
+          const existing = playerKillsMap.get(pId) || {
+            id: pId,
+            name: mp.player.name,
+            avatarUrl: mp.player.avatarUrl,
+            totalKills: 0,
+          };
+          existing.totalKills += mp.kills;
+          playerKillsMap.set(pId, existing);
         }
       }
-    } else if (match.playerId && match.player && match.kills === maxSingleMatchKills) {
-      winnersMap.set(match.player.id, {
-        id: match.player.id,
+    } else if (match.playerId && match.player) {
+      const pId = match.playerId;
+      const existing = playerKillsMap.get(pId) || {
+        id: pId,
         name: match.player.name,
         avatarUrl: match.player.avatarUrl,
-      });
+        totalKills: 0,
+      };
+      existing.totalKills += match.kills || 0;
+      playerKillsMap.set(pId, existing);
     }
   }
 
+  const allPlayers = Array.from(playerKillsMap.values());
+  if (allPlayers.length === 0) {
+    return { winners: [], totalKills: 0 };
+  }
+
+  let maxTotalKills = 0;
+  for (const p of allPlayers) {
+    if (p.totalKills > maxTotalKills) {
+      maxTotalKills = p.totalKills;
+    }
+  }
+
+  if (maxTotalKills === 0) {
+    return { winners: [], totalKills: 0 };
+  }
+
+  const winners = allPlayers.filter((p) => p.totalKills === maxTotalKills);
+
   return {
-    winners: Array.from(winnersMap.values()),
-    peakKills: maxSingleMatchKills,
+    winners: winners.map((w) => ({
+      id: w.id,
+      name: w.name,
+      avatarUrl: w.avatarUrl,
+    })),
+    totalKills: maxTotalKills,
   };
 }
+
 
 export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
   let session;
