@@ -22,10 +22,14 @@ model Player {
   role          Role          @default(PLAYER)
   accessKeyHash String?
   isActive      Boolean       @default(true)
+  teamId        String?
+  team          Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   matches       Match[]
   matchPlayers  MatchPlayer[]
+
+  @@index([teamId])
 }
 
 model GamingSession {
@@ -48,10 +52,12 @@ model Team {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   teams     MatchTeam[]
+  players   Player[]
 
   @@index([name])
   @@index([isActive])
 }
+
 
 model Match {
   id            String        @id @default(cuid())

@@ -1,10 +1,21 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db";
 
+export interface TeamPlayerSummary {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  role: "PLAYER" | "MODERATOR" | "ADMIN";
+  isActive: boolean;
+  teamId?: string | null;
+  teamName?: string | null;
+}
+
 export interface TeamRecord {
   id: string;
   name: string;
   isActive: boolean;
+  players?: TeamPlayerSummary[];
   playerCount?: number;
   createdAt: Date;
 }
@@ -17,8 +28,16 @@ export const getAllTeams = cache(async (): Promise<TeamRecord[]> => {
       name: true,
       isActive: true,
       createdAt: true,
-      _count: {
-        select: { teams: true },
+      players: {
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          avatarUrl: true,
+          role: true,
+          isActive: true,
+          teamId: true,
+        },
       },
     },
   });
@@ -27,14 +46,22 @@ export const getAllTeams = cache(async (): Promise<TeamRecord[]> => {
     id: t.id,
     name: t.name,
     isActive: t.isActive,
-    playerCount: t._count?.teams || 0,
+    players: (t.players || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      avatarUrl: p.avatarUrl,
+      role: p.role,
+      isActive: p.isActive,
+      teamId: p.teamId,
+      teamName: t.name,
+    })),
+    playerCount: t.players?.length || 0,
     createdAt: t.createdAt,
   }));
 });
 
 export const getActiveTeams = cache(async (): Promise<TeamRecord[]> => {
-
-  return await (prisma.team as any).findMany({
+  const teams = await (prisma.team as any).findMany({
     where: { isActive: true },
     orderBy: { name: "asc" },
     select: {
@@ -42,10 +69,156 @@ export const getActiveTeams = cache(async (): Promise<TeamRecord[]> => {
       name: true,
       isActive: true,
       createdAt: true,
+      players: {
+        where: { isActive: true },
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          avatarUrl: true,
+          role: true,
+          isActive: true,
+          teamId: true,
+        },
+      },
     },
   });
+
+  return teams.map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    isActive: t.isActive,
+    players: (t.players || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      avatarUrl: p.avatarUrl,
+      role: p.role,
+      isActive: p.isActive,
+      teamId: p.teamId,
+      teamName: t.name,
+    })),
+    playerCount: t.players?.length || 0,
+    createdAt: t.createdAt,
+  }));
 });
 
+export async function getTeamWithPlayers(teamId: string) {
+  const team = await (prisma.team as any).findUnique({
+    where: { id: teamId },
+    select: {
+      id: true,
+      name: true,
+      isActive: true,
+      players: {
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          avatarUrl: true,
+          role: true,
+          isActive: true,
+          teamId: true,
+        },
+      },
+    },
+  });
+
+  if (!team) {
+    throw new Error("Team not found.");
+  }
+
+  // Fetch all registered players to show available players for assignment
+  const allPlayers = await (prisma.player as any).findMany({
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      avatarUrl: true,
+      role: true,
+      isActive: true,
+      teamId: true,
+      team: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  const currentPlayers = team.players.map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    avatarUrl: p.avatarUrl,
+    role: p.role,
+    isActive: p.isActive,
+    teamId: p.teamId,
+    teamName: team.name,
+  }));
+
+  const availablePlayers = allPlayers
+    .filter((p: any) => p.teamId !== teamId)
+    .map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      avatarUrl: p.avatarUrl,
+      role: p.role,
+      isActive: p.isActive,
+      teamId: p.teamId || null,
+      teamName: p.team?.name || null,
+    }));
+
+  return {
+    team: {
+      id: team.id,
+      name: team.name,
+      isActive: team.isActive,
+    },
+    currentPlayers,
+    availablePlayers,
+  };
+}
+
+export async function assignPlayersToTeam(teamId: string, playerIds: string[]) {
+  if (!playerIds || playerIds.length === 0) {
+    return [];
+  }
+
+  const team = await (prisma.team as any).findUnique({
+    where: { id: teamId },
+    select: { id: true, name: true },
+  });
+
+  if (!team) {
+    throw new Error("Team not found.");
+  }
+
+  // Assign players to this team
+  await (prisma.player as any).updateMany({
+    where: {
+      id: { in: playerIds },
+    },
+    data: {
+      teamId,
+    },
+  });
+
+  return getTeamWithPlayers(teamId);
+}
+
+export async function removePlayerFromTeam(teamId: string, playerId: string) {
+  await (prisma.player as any).updateMany({
+    where: {
+      id: playerId,
+      teamId,
+    },
+    data: {
+      teamId: null,
+    },
+  });
+
+  return getTeamWithPlayers(teamId);
+}
 
 export async function createTeam(name: string): Promise<TeamRecord> {
   const trimmedName = name.trim();
@@ -54,7 +227,7 @@ export async function createTeam(name: string): Promise<TeamRecord> {
   }
 
   try {
-    return await (prisma.team as any).create({
+    const team = await (prisma.team as any).create({
       data: {
         name: trimmedName,
         isActive: true,
@@ -66,6 +239,12 @@ export async function createTeam(name: string): Promise<TeamRecord> {
         createdAt: true,
       },
     });
+
+    return {
+      ...team,
+      players: [],
+      playerCount: 0,
+    };
   } catch (err: any) {
     if (err?.code === "P2002") {
       throw new Error(`Team name "${trimmedName}" already exists.`);
@@ -91,7 +270,7 @@ export async function updateTeam(
   }
 
   try {
-    return await (prisma.team as any).update({
+    const team = await (prisma.team as any).update({
       where: { id },
       data: updateData,
       select: {
@@ -99,8 +278,27 @@ export async function updateTeam(
         name: true,
         isActive: true,
         createdAt: true,
+        players: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            role: true,
+            isActive: true,
+            teamId: true,
+          },
+        },
       },
     });
+
+    return {
+      id: team.id,
+      name: team.name,
+      isActive: team.isActive,
+      players: team.players || [],
+      playerCount: team.players?.length || 0,
+      createdAt: team.createdAt,
+    };
   } catch (err: any) {
     if (err?.code === "P2002") {
       throw new Error(`Team name "${data.name}" already exists.`);
@@ -118,6 +316,12 @@ export async function deleteTeam(id: string) {
   if (matchCount > 0) {
     throw new Error("Cannot delete team with historical match records. Please deactivate the team instead.");
   }
+
+  // Remove team assignments from players before deleting
+  await (prisma.player as any).updateMany({
+    where: { teamId: id },
+    data: { teamId: null },
+  });
 
   return await (prisma.team as any).delete({
     where: { id },

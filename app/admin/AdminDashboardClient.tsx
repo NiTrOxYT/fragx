@@ -13,11 +13,22 @@ export interface AdminPlayer {
   isActive: boolean;
 }
 
+export interface AdminTeamPlayer {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  role: "PLAYER" | "MODERATOR" | "ADMIN";
+  isActive: boolean;
+  teamId?: string | null;
+  teamName?: string | null;
+}
+
 export interface AdminTeam {
   id: string;
   name: string;
   isActive: boolean;
-  playerCount: number;
+  players?: AdminTeamPlayer[];
+  playerCount?: number;
 }
 
 export interface AdminMatchItem {
@@ -96,6 +107,20 @@ export default function AdminDashboardClient({
   const [newTeamName, setNewTeamName] = useState("");
   const [teamActionMsg, setTeamActionMsg] = useState("");
   const [loadingTeamId, setLoadingTeamId] = useState<string | null>(null);
+
+  // Team Players Management Modal state
+  const [teamToManage, setTeamToManage] = useState<AdminTeam | null>(null);
+  const [teamPlayersLoading, setTeamPlayersLoading] = useState(false);
+  const [teamCurrentPlayers, setTeamCurrentPlayers] = useState<AdminTeamPlayer[]>([]);
+  const [teamAvailablePlayers, setTeamAvailablePlayers] = useState<AdminTeamPlayer[]>([]);
+  const [selectedPlayerIdsToAdd, setSelectedPlayerIdsToAdd] = useState<string[]>([]);
+  const [isSavingTeamPlayers, setIsSavingTeamPlayers] = useState(false);
+  const [managePlayersActionMsg, setManagePlayersActionMsg] = useState("");
+  const [playerToMoveConfirm, setPlayerToMoveConfirm] = useState<{
+    player: AdminTeamPlayer;
+    targetTeam: AdminTeam;
+  } | null>(null);
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -378,6 +403,149 @@ export default function AdminDashboardClient({
       setLoadingTeamId(null);
     }
   };
+
+  // Open Manage Players Modal
+  const handleOpenManagePlayers = async (team: AdminTeam) => {
+    setTeamToManage(team);
+    setTeamPlayersLoading(true);
+    setManagePlayersActionMsg("");
+    setSelectedPlayerIdsToAdd([]);
+    setPlayerToMoveConfirm(null);
+
+    try {
+      const res = await fetch(`/api/teams/${team.id}/players`);
+      const data = await res.json();
+      if (res.ok) {
+        setTeamCurrentPlayers(data.currentPlayers || []);
+        setTeamAvailablePlayers(data.availablePlayers || []);
+      } else {
+        setManagePlayersActionMsg(data.error || "Failed to load players.");
+      }
+    } catch (err) {
+      setManagePlayersActionMsg("Error loading team players.");
+    } finally {
+      setTeamPlayersLoading(false);
+    }
+  };
+
+  // Toggle player selection for adding
+  const handleToggleSelectPlayer = (player: AdminTeamPlayer) => {
+    if (selectedPlayerIdsToAdd.includes(player.id)) {
+      setSelectedPlayerIdsToAdd((prev) => prev.filter((id) => id !== player.id));
+      return;
+    }
+
+    // If player belongs to another team, prompt confirmation first
+    if (player.teamName && player.teamId !== teamToManage?.id) {
+      setPlayerToMoveConfirm({
+        player,
+        targetTeam: teamToManage!,
+      });
+      return;
+    }
+
+    setSelectedPlayerIdsToAdd((prev) => [...prev, player.id]);
+  };
+
+  // Confirm moving player from another team
+  const handleConfirmMovePlayer = () => {
+    if (playerToMoveConfirm) {
+      setSelectedPlayerIdsToAdd((prev) => [...prev, playerToMoveConfirm.player.id]);
+      setPlayerToMoveConfirm(null);
+    }
+  };
+
+  // Add selected players to team
+  const handleAddSelectedPlayers = async () => {
+    if (!teamToManage || selectedPlayerIdsToAdd.length === 0) return;
+
+    setIsSavingTeamPlayers(true);
+    setManagePlayersActionMsg("");
+
+    try {
+      const res = await fetch(`/api/teams/${teamToManage.id}/players`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerIds: selectedPlayerIdsToAdd }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setTeamCurrentPlayers(data.currentPlayers || []);
+        setTeamAvailablePlayers(data.availablePlayers || []);
+        setSelectedPlayerIdsToAdd([]);
+        setManagePlayersActionMsg("Players assigned successfully.");
+
+        // Update main teams list state
+        setTeams((prev) =>
+          prev.map((t) =>
+            t.id === teamToManage.id
+              ? {
+                  ...t,
+                  players: data.currentPlayers || [],
+                  playerCount: data.currentPlayers?.length || 0,
+                }
+              : {
+                  ...t,
+                  players: (t.players || []).filter(
+                    (p) => !selectedPlayerIdsToAdd.includes(p.id)
+                  ),
+                  playerCount: (t.players || []).filter(
+                    (p) => !selectedPlayerIdsToAdd.includes(p.id)
+                  ).length,
+                }
+          )
+        );
+      } else {
+        setManagePlayersActionMsg(data.error || "Failed to assign players.");
+      }
+    } catch (err) {
+      setManagePlayersActionMsg("Error assigning players.");
+    } finally {
+      setIsSavingTeamPlayers(false);
+    }
+  };
+
+  // Remove player from team
+  const handleRemovePlayerFromTeam = async (playerId: string) => {
+    if (!teamToManage) return;
+
+    setIsSavingTeamPlayers(true);
+    setManagePlayersActionMsg("");
+
+    try {
+      const res = await fetch(`/api/teams/${teamToManage.id}/players/${playerId}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setTeamCurrentPlayers(data.currentPlayers || []);
+        setTeamAvailablePlayers(data.availablePlayers || []);
+        setManagePlayersActionMsg("Player removed from team.");
+
+        // Update main teams list state
+        setTeams((prev) =>
+          prev.map((t) =>
+            t.id === teamToManage.id
+              ? {
+                  ...t,
+                  players: data.currentPlayers || [],
+                  playerCount: data.currentPlayers?.length || 0,
+                }
+              : t
+          )
+        );
+      } else {
+        setManagePlayersActionMsg(data.error || "Failed to remove player.");
+      }
+    } catch (err) {
+      setManagePlayersActionMsg("Error removing player.");
+    } finally {
+      setIsSavingTeamPlayers(false);
+    }
+  };
+
 
   if (!isAuthenticated) {
     return (
@@ -1199,52 +1367,101 @@ export default function AdminDashboardClient({
           )}
 
           {/* Teams Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {teams.length > 0 ? (
               teams.map((t) => (
                 <div
                   key={t.id}
-                  className={`glass-panel rounded-xl p-4 flex items-center justify-between gap-4 border transition-colors ${
-                    !t.isActive ? "opacity-50 bg-surface-container/30" : "hover:border-primary/40"
+                  className={`glass-panel rounded-xl p-5 flex flex-col justify-between gap-4 border transition-colors ${
+                    !t.isActive ? "opacity-60 bg-surface-container/30" : "hover:border-primary/40"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-bold">
-                      <span className="material-symbols-outlined text-xl">shield</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-bold shrink-0">
+                        <span className="material-symbols-outlined text-2xl">shield</span>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-headline text-headline-sm text-on-surface">
+                            {t.name}
+                          </h4>
+                          <span className="font-label-caps text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-primary/10 text-primary border border-primary/30">
+                            {t.players?.length || t.playerCount || 0} PLAYERS
+                          </span>
+                        </div>
+                        <span className="font-body text-xs text-on-surface-variant/70 block mt-0.5">
+                          Status: {t.isActive ? "Active Team" : "Inactive"}
+                        </span>
+                      </div>
                     </div>
 
-                    <div>
-                      <h4 className="font-headline text-headline-sm text-on-surface">
-                        {t.name}
-                      </h4>
-                      <span className="font-body text-xs text-on-surface-variant/70 block mt-0.5">
-                        Status: {t.isActive ? "Active Team" : "Inactive"}
-                      </span>
+                    <div className="flex items-center gap-1.5">
+                      {/* Active Toggle Switch */}
+                      <button
+                        onClick={() => handleUpdateTeam(t.id, { isActive: !t.isActive })}
+                        disabled={loadingTeamId === t.id}
+                        className={`font-label-caps text-xs px-2.5 py-1 rounded border transition-colors ${
+                          t.isActive
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                            : "bg-surface-container text-on-surface-variant border-surface-variant hover:text-on-surface"
+                        }`}
+                      >
+                        {t.isActive ? "Active" : "Inactive"}
+                      </button>
+
+                      {/* Delete Team */}
+                      <button
+                        onClick={() => handleDeleteTeam(t.id, t.name)}
+                        disabled={loadingTeamId === t.id}
+                        title="Delete Team"
+                        className="p-1 text-on-surface-variant hover:text-error transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-lg">delete</span>
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    {/* Active Toggle Switch */}
-                    <button
-                      onClick={() => handleUpdateTeam(t.id, { isActive: !t.isActive })}
-                      disabled={loadingTeamId === t.id}
-                      className={`font-label-caps text-xs px-3 py-1.5 rounded border transition-colors ${
-                        t.isActive
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                          : "bg-surface-container text-on-surface-variant border-surface-variant hover:text-on-surface"
-                      }`}
-                    >
-                      {t.isActive ? "Active" : "Inactive"}
-                    </button>
+                  {/* Assigned Players List */}
+                  <div className="space-y-2 pt-2 border-t border-surface-container-high/60">
+                    <div className="font-label-caps text-[10px] text-on-surface-variant uppercase tracking-wider">
+                      Roster Members:
+                    </div>
+                    {t.players && t.players.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {t.players.map((p) => (
+                          <span
+                            key={p.id}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container border border-surface-container-high text-xs font-mono text-on-surface"
+                          >
+                            <img
+                              src={p.avatarUrl}
+                              alt={p.name}
+                              className="w-4 h-4 rounded-full object-cover"
+                            />
+                            <span>{p.name}</span>
+                            <span className="text-[9px] text-primary uppercase font-bold">
+                              [{p.role}]
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-on-surface-variant/60 font-body italic">
+                        No players assigned yet. Click Manage Players to add fraggers.
+                      </div>
+                    )}
+                  </div>
 
-                    {/* Delete Team */}
+                  {/* Manage Players CTA */}
+                  <div className="pt-2 border-t border-surface-container-high/60 flex justify-end">
                     <button
-                      onClick={() => handleDeleteTeam(t.id, t.name)}
-                      disabled={loadingTeamId === t.id}
-                      title="Delete Team"
-                      className="p-1.5 text-on-surface-variant hover:text-error transition-colors"
+                      onClick={() => handleOpenManagePlayers(t)}
+                      className="w-full sm:w-auto px-4 py-2 rounded-lg bg-primary-cta text-white hover:bg-primary-container font-label-caps text-xs flex items-center justify-center gap-1.5 transition-all uppercase font-bold shadow-[0_0_10px_rgba(255,77,0,0.25)]"
                     >
-                      <span className="material-symbols-outlined text-lg">delete</span>
+                      <span className="material-symbols-outlined text-base">group_add</span>
+                      MANAGE PLAYERS
                     </button>
                   </div>
                 </div>
@@ -1263,6 +1480,239 @@ export default function AdminDashboardClient({
 
       {/* Edit Player Modal Portal */}
       {editModalContent && createPortal(editModalContent, document.body)}
+
+      {/* Manage Team Players Modal Portal */}
+      {teamToManage &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+            <div className="w-full max-w-2xl bg-[#171717]/95 border border-primary/40 rounded-2xl p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-surface-container-high pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary">
+                    <span className="material-symbols-outlined text-2xl">shield</span>
+                  </div>
+                  <div>
+                    <span className="font-label-caps text-[10px] text-primary uppercase tracking-widest font-bold block">
+                      TEAM ROSTER MANAGEMENT
+                    </span>
+                    <h3 className="font-headline text-headline-sm text-on-surface uppercase">
+                      {teamToManage.name}
+                    </h3>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setTeamToManage(null)}
+                  className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg transition-colors"
+                >
+                  <span className="material-symbols-outlined text-2xl">close</span>
+                </button>
+              </div>
+
+              {/* Status Action Message */}
+              {managePlayersActionMsg && (
+                <div className="p-3 rounded-lg bg-surface-container border border-primary/30 text-primary font-body text-xs text-center">
+                  {managePlayersActionMsg}
+                </div>
+              )}
+
+              {/* SECTION 1: CURRENT PLAYERS */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-label-caps text-xs text-on-surface-variant uppercase tracking-wider font-bold">
+                    CURRENT PLAYERS ({teamCurrentPlayers.length})
+                  </h4>
+                </div>
+
+                {teamPlayersLoading ? (
+                  <div className="text-center py-6 text-on-surface-variant font-label-caps text-xs flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-lg animate-spin">
+                      progress_activity
+                    </span>
+                    LOADING ROSTER...
+                  </div>
+                ) : teamCurrentPlayers.length > 0 ? (
+                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                    {teamCurrentPlayers.map((p) => (
+                      <div
+                        key={p.id}
+                        className="glass-panel rounded-xl p-3 flex items-center justify-between gap-3 border border-surface-container-high"
+                      >
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={p.avatarUrl}
+                            alt={p.name}
+                            className="w-9 h-9 rounded-full object-cover border border-surface-container-high"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-headline text-sm text-on-surface font-bold">
+                                {p.name}
+                              </span>
+                              <span className="font-label-caps text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/30 font-bold uppercase">
+                                {p.role}
+                              </span>
+                            </div>
+                            <span className="font-body text-[11px] text-on-surface-variant/70 block">
+                              {p.isActive ? "Active Fragger" : "Inactive"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleRemovePlayerFromTeam(p.id)}
+                          disabled={isSavingTeamPlayers}
+                          className="px-3 py-1.5 rounded-lg bg-error/10 hover:bg-error/20 border border-error/40 text-error font-label-caps text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-sm">person_remove</span>
+                          REMOVE
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-surface-container/50 border border-surface-container-high text-center text-xs text-on-surface-variant font-body">
+                    No players currently assigned to {teamToManage.name}. Select from available players below.
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: ADD PLAYERS TO TEAM */}
+              <div className="space-y-3 pt-4 border-t border-surface-container-high">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-label-caps text-xs text-on-surface-variant uppercase tracking-wider font-bold">
+                    AVAILABLE PLAYERS TO ADD
+                  </h4>
+                  <span className="font-label-caps text-[10px] text-primary">
+                    {selectedPlayerIdsToAdd.length} SELECTED
+                  </span>
+                </div>
+
+                {teamAvailablePlayers.length > 0 ? (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {teamAvailablePlayers.map((p) => {
+                      const isSelected = selectedPlayerIdsToAdd.includes(p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => handleToggleSelectPlayer(p)}
+                          className={`rounded-xl p-3 flex items-center justify-between gap-3 border cursor-pointer transition-all ${
+                            isSelected
+                              ? "bg-primary/10 border-primary/60 shadow-[0_0_10px_rgba(255,77,0,0.15)]"
+                              : "glass-panel border-surface-container-high hover:border-surface-container-highest"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
+                                isSelected
+                                  ? "bg-primary-cta border-primary text-white"
+                                  : "border-surface-container-high bg-surface-container text-transparent"
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-sm">check</span>
+                            </div>
+
+                            <img
+                              src={p.avatarUrl}
+                              alt={p.name}
+                              className="w-9 h-9 rounded-full object-cover border border-surface-container-high"
+                            />
+
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-headline text-sm text-on-surface font-bold">
+                                  {p.name}
+                                </span>
+                                <span className="font-label-caps text-[9px] px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant border border-surface-container-high font-bold uppercase">
+                                  {p.role}
+                                </span>
+                              </div>
+
+                              {p.teamName ? (
+                                <span className="font-body text-[11px] text-amber-400 font-semibold block">
+                                  ⚠️ Currently assigned to {p.teamName}
+                                </span>
+                              ) : (
+                                <span className="font-body text-[11px] text-emerald-400 font-semibold block">
+                                  ✓ Unassigned Fragger
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-surface-container/50 border border-surface-container-high text-center text-xs text-on-surface-variant font-body">
+                    All registered players are already in this team.
+                  </div>
+                )}
+
+                {/* Add Selected Players CTA */}
+                <div className="flex items-center justify-end gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setTeamToManage(null)}
+                    className="px-4 py-2.5 rounded-xl border border-surface-container-high text-on-surface-variant font-label-caps text-xs hover:text-on-surface transition-colors"
+                  >
+                    CLOSE
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleAddSelectedPlayers}
+                    disabled={selectedPlayerIdsToAdd.length === 0 || isSavingTeamPlayers}
+                    className="px-6 py-2.5 rounded-xl bg-primary-cta text-white font-label-caps text-xs font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(255,77,0,0.3)] hover:bg-primary-container disabled:opacity-50 transition-all flex items-center gap-2"
+                  >
+                    {isSavingTeamPlayers && (
+                      <span className="material-symbols-outlined text-sm animate-spin">
+                        progress_activity
+                      </span>
+                    )}
+                    ADD SELECTED PLAYERS ({selectedPlayerIdsToAdd.length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Move Player Confirmation Dialog */}
+              {playerToMoveConfirm && (
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 space-y-3 animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2 text-amber-400 font-label-caps text-xs font-bold uppercase">
+                    <span className="material-symbols-outlined text-base">swap_horiz</span>
+                    CONFIRM ROSTER TRANSFER
+                  </div>
+                  <p className="font-body text-xs text-on-surface">
+                    <span className="font-bold text-white">{playerToMoveConfirm.player.name}</span> is currently assigned to{" "}
+                    <span className="font-bold text-amber-400">{playerToMoveConfirm.player.teamName}</span>. Move them to{" "}
+                    <span className="font-bold text-primary">{playerToMoveConfirm.targetTeam.name}</span>?
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPlayerToMoveConfirm(null)}
+                      className="px-3 py-1.5 rounded-lg border border-surface-container-high text-on-surface-variant font-label-caps text-xs"
+                    >
+                      CANCEL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmMovePlayer}
+                      className="px-4 py-1.5 rounded-lg bg-amber-500 text-black font-label-caps text-xs font-bold"
+                    >
+                      MOVE PLAYER
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
     </main>
   );
 }
+

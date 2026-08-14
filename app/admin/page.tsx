@@ -38,8 +38,10 @@ export default async function AdminDashboardPage() {
         id: t.id,
         name: t.name,
         isActive: t.isActive,
-        playerCount: t.playerCount || 0,
+        players: t.players || [],
+        playerCount: t.players?.length || 0,
       }))}
+
       stats={{
         totalMatches: summary.matchCount,
         totalKills: summary.totalKills,
