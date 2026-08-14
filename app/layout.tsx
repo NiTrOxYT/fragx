@@ -29,12 +29,13 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
 });
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://fragx.theaveniq.site";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://fragx.app"),
+  metadataBase: new URL(appUrl),
   title: "FRAGX — BGMI Competitive Gaming Platform",
   description: "Live BGMI match scores, leaderboard, MVP awards, and gaming session stats.",
   manifest: "/manifest.json",
-
   icons: {
     icon: "/images/logo.png",
     shortcut: "/images/logo.png",
@@ -43,14 +44,16 @@ export const metadata: Metadata = {
   openGraph: {
     title: "FRAGX — BGMI Competitive Gaming Platform",
     description: "Live BGMI match scores, leaderboard, MVP awards, and gaming session stats.",
-    url: "https://fragx.app",
+    url: appUrl,
     siteName: "FRAGX",
     images: [
       {
-        url: "/images/preview.png",
+        url: "/images/preview.jpg",
+        secureUrl: `${appUrl}/images/preview.jpg`,
         width: 1200,
         height: 630,
-        alt: "FRAGX BGMI Gaming Platform",
+        type: "image/jpeg",
+        alt: "FRAGX — BGMI Competitive Gaming Platform",
       },
     ],
     locale: "en_US",
@@ -60,7 +63,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "FRAGX — BGMI Competitive Gaming Platform",
     description: "Live BGMI match scores, leaderboard, MVP awards, and gaming session stats.",
-    images: ["/images/preview.png"],
+    images: [`${appUrl}/images/preview.jpg`],
   },
   appleWebApp: {
     capable: true,
@@ -68,6 +71,7 @@ export const metadata: Metadata = {
     title: "FRAGX",
   },
 };
+
 
 export const viewport: Viewport = {
   themeColor: "#0A0A0A",
