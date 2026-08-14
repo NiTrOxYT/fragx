@@ -1,7 +1,7 @@
 {
-  "name": "FRAGX - Your Squad. Your Stats. Your Night.",
+  "name": "FRAGX — BGMI Competitive Gaming Platform",
   "short_name": "FRAGX",
-  "description": "Private mobile-first BGMI gaming companion & statistics platform for squad nights.",
+  "description": "Live BGMI match scores, leaderboard, MVP awards, and gaming session stats.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0A0A0A",
@@ -9,15 +9,9 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "https://api.dicebear.com/7.x/bottts/svg?seed=FRAGX",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "https://api.dicebear.com/7.x/bottts/svg?seed=FRAGX",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
+      "src": "/images/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

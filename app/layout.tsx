@@ -7,9 +7,38 @@ import { verifyAccessAuth } from "@/lib/services/access";
 import AccessGateClient from "@/components/common/AccessGateClient";
 
 export const metadata: Metadata = {
-  title: "FRAGX - Your Squad. Your Stats. Your Night.",
-  description: "Private mobile-first BGMI gaming companion & statistics platform for squad nights.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://fragx.app"),
+  title: "FRAGX — BGMI Competitive Gaming Platform",
+  description: "Live BGMI match scores, leaderboard, MVP awards, and gaming session stats.",
   manifest: "/manifest.json",
+
+  icons: {
+    icon: "/images/logo.png",
+    shortcut: "/images/logo.png",
+    apple: "/images/logo.png",
+  },
+  openGraph: {
+    title: "FRAGX — BGMI Competitive Gaming Platform",
+    description: "Live BGMI match scores, leaderboard, MVP awards, and gaming session stats.",
+    url: "https://fragx.app",
+    siteName: "FRAGX",
+    images: [
+      {
+        url: "/images/preview.png",
+        width: 1200,
+        height: 630,
+        alt: "FRAGX BGMI Gaming Platform",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "FRAGX — BGMI Competitive Gaming Platform",
+    description: "Live BGMI match scores, leaderboard, MVP awards, and gaming session stats.",
+    images: ["/images/preview.png"],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -49,4 +78,3 @@ export default async function RootLayout({
     </html>
   );
 }
-

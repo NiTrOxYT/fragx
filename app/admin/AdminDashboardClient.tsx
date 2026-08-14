@@ -20,10 +20,22 @@ export interface AdminTeam {
   playerCount: number;
 }
 
+export interface AdminMatchItem {
+  id: string;
+  matchNumber: number;
+  dateStr: string;
+  sessionStatus: "DRAFT" | "PUBLISHED";
+  sessionId: string;
+  totalKills: number;
+  topTeamName: string;
+  topPlacement: number;
+}
+
 interface AdminDashboardClientProps {
   isAuthenticated: boolean;
   activeDraftId: string;
   draftMatchCount: number;
+  initialMatches?: AdminMatchItem[];
   initialPlayers: AdminPlayer[];
   initialTeams: AdminTeam[];
   stats: {
@@ -39,6 +51,7 @@ export default function AdminDashboardClient({
   isAuthenticated,
   activeDraftId,
   draftMatchCount,
+  initialMatches = [],
   initialPlayers,
   initialTeams,
   stats,
@@ -50,6 +63,12 @@ export default function AdminDashboardClient({
 
   // Management section active tab: "MATCHES" | "PLAYERS" | "TEAMS"
   const [activeTab, setActiveTab] = useState<"MATCHES" | "PLAYERS" | "TEAMS">("MATCHES");
+
+  // Matches management state
+  const [matches, setMatches] = useState<AdminMatchItem[]>(initialMatches);
+  const [matchToDelete, setMatchToDelete] = useState<AdminMatchItem | null>(null);
+  const [isDeletingMatch, setIsDeletingMatch] = useState(false);
+  const [matchActionMsg, setMatchActionMsg] = useState("");
 
   // Player management state
   const [players, setPlayers] = useState<AdminPlayer[]>(initialPlayers);
@@ -106,6 +125,34 @@ export default function AdminDashboardClient({
   const handleLogout = async () => {
     await fetch("/api/auth", { method: "DELETE" });
     router.refresh();
+  };
+
+  // Delete Match handler
+  const handleConfirmDeleteMatch = async () => {
+    if (!matchToDelete) return;
+
+    setIsDeletingMatch(true);
+    setMatchActionMsg("");
+
+    try {
+      const res = await fetch(`/api/matches/${matchToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setMatches((prev) => prev.filter((m) => m.id !== matchToDelete.id));
+        setMatchActionMsg(`Match #${matchToDelete.matchNumber} permanently deleted.`);
+        setMatchToDelete(null);
+        router.refresh();
+      } else {
+        setMatchActionMsg(data.error || "Failed to delete match.");
+      }
+    } catch (err: any) {
+      setMatchActionMsg("Error deleting match.");
+    } finally {
+      setIsDeletingMatch(false);
+    }
   };
 
   // Add new player
@@ -380,6 +427,62 @@ export default function AdminDashboardClient({
     );
   }
 
+  // Delete Match Confirmation Modal
+  const deleteMatchModalContent = matchToDelete && (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-[#171717]/95 border border-error/40 rounded-2xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+        <div className="flex items-center gap-3 border-b border-surface-container-high pb-3 text-error">
+          <span className="material-symbols-outlined text-2xl">warning</span>
+          <h3 className="font-headline text-headline-sm text-on-surface uppercase">
+            DELETE MATCH?
+          </h3>
+        </div>
+
+        <p className="font-body text-sm text-on-surface-variant">
+          Are you sure you want to permanently delete this match?
+        </p>
+
+        {/* Info Box */}
+        <div className="glass-panel rounded-xl p-4 border border-surface-container-high bg-black/40 space-y-1 font-mono text-xs text-on-surface">
+          <div className="font-bold text-primary text-sm uppercase">
+            MATCH #{matchToDelete.matchNumber}
+          </div>
+          <div>{matchToDelete.dateStr}</div>
+          <div>{matchToDelete.totalKills} KILLS</div>
+          <div>#{matchToDelete.topPlacement} PLACEMENT</div>
+        </div>
+
+        <div className="p-3 rounded-lg bg-error/10 border border-error/30 text-error font-label-caps text-xs">
+          ⚠️ This action cannot be undone.
+        </div>
+
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-surface-container-high">
+          <button
+            type="button"
+            onClick={() => setMatchToDelete(null)}
+            disabled={isDeletingMatch}
+            className="px-4 py-2.5 rounded-xl border border-surface-container-high text-on-surface-variant font-label-caps text-xs hover:text-on-surface transition-colors"
+          >
+            CANCEL
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmDeleteMatch}
+            disabled={isDeletingMatch}
+            className="px-5 py-2.5 rounded-xl bg-error text-on-error font-label-caps text-xs font-bold shadow-[0_0_15px_rgba(255,0,0,0.3)] hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+          >
+            {isDeletingMatch && (
+              <span className="material-symbols-outlined text-sm animate-spin">
+                progress_activity
+              </span>
+            )}
+            {isDeletingMatch ? "DELETING..." : "DELETE MATCH"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   // Admin Edit Player Modal JSX
   const editModalContent = editingPlayer && (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -624,6 +727,12 @@ export default function AdminDashboardClient({
             )}
           </div>
 
+          {matchActionMsg && (
+            <div className="p-3 rounded-lg bg-surface-container border border-primary/30 text-primary font-body text-xs text-center">
+              {matchActionMsg}
+            </div>
+          )}
+
           {/* Bento Grid: Key Stats */}
           <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Matches Stat */}
@@ -703,6 +812,91 @@ export default function AdminDashboardClient({
                   </span>
                 </div>
               </div>
+            </div>
+          </section>
+
+          {/* ADMIN MATCH MANAGEMENT LIST */}
+          <section className="space-y-3">
+            <div className="flex justify-between items-center bg-surface-container rounded-xl p-4 border border-surface-container-high">
+              <h3 className="font-headline text-headline-sm text-on-surface uppercase">
+                LOGGED MATCHES ({matches.length})
+              </h3>
+              <span className="font-label-caps text-xs text-on-surface-variant">
+                Manage & Delete Matches
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {matches.length > 0 ? (
+                matches.map((m) => (
+                  <div
+                    key={m.id}
+                    className="glass-panel rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 border border-surface-container-high hover:border-primary/40 transition-colors"
+                  >
+                    {/* Match Overview */}
+                    <div className="flex items-center gap-4 w-full sm:w-auto">
+                      <div className="w-12 h-12 rounded-xl bg-surface-container border border-surface-container-high flex flex-col items-center justify-center shrink-0">
+                        <span className="font-display-stat text-lg text-primary">
+                          #{m.matchNumber}
+                        </span>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-headline text-headline-sm text-on-surface">
+                            MATCH #{m.matchNumber}
+                          </h4>
+                          <span
+                            className={`font-label-caps text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                              m.sessionStatus === "PUBLISHED"
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                                : "bg-primary/10 text-primary border border-primary/30"
+                            }`}
+                          >
+                            {m.sessionStatus}
+                          </span>
+                        </div>
+
+                        <div className="font-body text-xs text-on-surface-variant flex items-center gap-2 mt-0.5">
+                          <span>{m.dateStr}</span>
+                          <span>•</span>
+                          <span>{m.totalKills} KILLS</span>
+                          <span>•</span>
+                          <span className="text-gold font-bold">
+                            #{m.topPlacement} {m.topTeamName}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-surface-container-high">
+                      <Link
+                        href={`/matches/${m.id}`}
+                        className="px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-high border border-surface-container-high text-on-surface font-label-caps text-xs flex items-center gap-1 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-sm">visibility</span>
+                        VIEW
+                      </Link>
+
+                      {/* DELETE MATCH Button */}
+                      <button
+                        type="button"
+                        onClick={() => setMatchToDelete(m)}
+                        className="px-3 py-1.5 rounded bg-error/10 hover:bg-error/20 border border-error/40 text-error font-label-caps text-xs flex items-center gap-1 transition-colors font-bold"
+                        title="Delete Match"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                        DELETE
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-10 text-on-surface-variant font-label-caps text-label-caps glass-panel rounded-xl">
+                  NO MATCHES LOGGED YET.
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -1053,6 +1247,9 @@ export default function AdminDashboardClient({
           </div>
         </div>
       )}
+
+      {/* Delete Match Modal Portal */}
+      {deleteMatchModalContent && createPortal(deleteMatchModalContent, document.body)}
 
       {/* Edit Player Modal Portal */}
       {editModalContent && createPortal(editModalContent, document.body)}

@@ -1,6 +1,7 @@
 import { verifyAdminAuth } from "@/lib/services/admin";
-import { getLatestPublishedSession, getMVP, getSessionSummary } from "@/lib/services/stats";
+import { getMVP, getSessionSummary } from "@/lib/services/stats";
 import { getOrCreateActiveDraftSession } from "@/lib/services/sessions";
+import { getAllAdminMatches } from "@/lib/services/matches";
 import { getAllPlayers } from "@/lib/services/players";
 import { getAllTeams } from "@/lib/services/teams";
 import AdminDashboardClient from "./AdminDashboardClient";
@@ -8,11 +9,12 @@ import AdminDashboardClient from "./AdminDashboardClient";
 export const revalidate = 0;
 
 export default async function AdminDashboardPage() {
-  const [isAuthenticated, activeDraft, summary, mvpData, players, teams] = await Promise.all([
+  const [isAuthenticated, activeDraft, summary, mvpData, allMatches, players, teams] = await Promise.all([
     verifyAdminAuth(),
     getOrCreateActiveDraftSession(),
     getSessionSummary(),
     getMVP(),
+    getAllAdminMatches(),
     getAllPlayers(),
     getAllTeams(),
   ]);
@@ -24,6 +26,7 @@ export default async function AdminDashboardPage() {
       isAuthenticated={isAuthenticated}
       activeDraftId={activeDraft.id}
       draftMatchCount={activeDraft.matches.length}
+      initialMatches={allMatches}
       initialPlayers={players.map((p) => ({
         id: p.id,
         name: p.name,
@@ -47,5 +50,3 @@ export default async function AdminDashboardPage() {
     />
   );
 }
-
-

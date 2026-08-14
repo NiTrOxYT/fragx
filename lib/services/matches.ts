@@ -246,8 +246,99 @@ export async function createMatch(data: {
   }
 }
 
-export async function deleteMatch(id: string) {
-  return await prisma.match.delete({
-    where: { id },
+export interface AdminMatchItem {
+  id: string;
+  matchNumber: number;
+  dateStr: string;
+  sessionStatus: "DRAFT" | "PUBLISHED";
+  sessionId: string;
+  totalKills: number;
+  topTeamName: string;
+  topPlacement: number;
+}
+
+export async function getAllAdminMatches(): Promise<AdminMatchItem[]> {
+  const matches = await (prisma.match as any).findMany({
+    orderBy: [
+      { createdAt: "desc" },
+    ],
+    select: {
+      id: true,
+      matchNumber: true,
+      kills: true,
+      placement: true,
+      createdAt: true,
+      player: {
+        select: { id: true, name: true },
+      },
+      session: {
+        select: { id: true, date: true, status: true },
+      },
+      matchTeams: {
+        select: {
+          id: true,
+          placement: true,
+          team: {
+            select: { id: true, name: true },
+          },
+          players: {
+            select: { kills: true },
+          },
+        },
+        orderBy: { placement: "asc" },
+      },
+    },
+  });
+
+  return matches.map((m: any) => {
+    const isMultiTeam = m.matchTeams && m.matchTeams.length > 0;
+    const topTeam = isMultiTeam ? m.matchTeams[0] : null;
+    const totalKills = isMultiTeam
+      ? m.matchTeams.reduce(
+          (acc: number, mt: any) =>
+            acc + mt.players.reduce((pAcc: number, p: any) => pAcc + p.kills, 0),
+          0
+        )
+      : m.kills || 0;
+    const topPlacement = isMultiTeam ? topTeam?.placement || 1 : m.placement || 1;
+    const topTeamName = isMultiTeam ? topTeam?.team.name || "Squad" : m.player?.name || "Player";
+    const dateStr = formatSessionDate(m.session.date);
+
+    return {
+      id: m.id,
+      matchNumber: m.matchNumber,
+      dateStr,
+      sessionStatus: m.session.status,
+      sessionId: m.session.id,
+      totalKills,
+      topTeamName,
+      topPlacement,
+    };
   });
 }
+
+export async function deleteMatch(id: string) {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Delete dependent MatchPlayer records
+    await (tx as any).matchPlayer.deleteMany({
+      where: {
+        matchTeam: {
+          matchId: id,
+        },
+      },
+    });
+
+    // 2. Delete dependent MatchTeam records
+    await (tx as any).matchTeam.deleteMany({
+      where: { matchId: id },
+    });
+
+    // 3. Delete Match record
+    const deletedMatch = await tx.match.delete({
+      where: { id },
+    });
+
+    return deletedMatch;
+  });
+}
+
