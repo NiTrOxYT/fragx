@@ -1,12 +1,12 @@
 import Link from "next/link";
 import {
   getLatestPublishedSession,
-
   getMVP,
   getGoldenGunAward,
   getSessionSummary,
   getRecentMatches,
 } from "@/lib/services/stats";
+import { formatSessionDate } from "@/lib/utils/dates";
 import GoldenGunAward from "@/components/common/GoldenGunAward";
 import EmptyState from "@/components/common/EmptyState";
 
@@ -37,66 +37,113 @@ export default async function HomePage() {
   ]);
 
   const mainMvp = mvpData?.players[0];
+  const sessionDateStr = formatSessionDate(latestSession.date);
 
   return (
-    <main className="pt-header-safe md:pt-24 px-safe-margin max-w-7xl mx-auto space-y-stack-lg flex flex-col items-center w-full pb-[100px] md:pb-12">
-
-
-      {/* Hero Section: MVP */}
+    <main className="pt-header-safe md:pt-24 px-safe-margin max-w-7xl mx-auto space-y-6 md:space-y-8 flex flex-col items-center w-full pb-[100px] md:pb-12">
+      {/* Hero Section: Championship MVP */}
       {mainMvp ? (
-        <section className="w-full max-w-3xl relative rounded-xl overflow-hidden glass-panel elite-glow border border-[#D4AF37]/30 p-1">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#171717] to-[#0A0A0A] z-0" />
-          <div className="absolute top-0 right-0 w-64 h-64 bg-[#D4AF37]/5 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none z-0" />
-          
-          <div className="relative z-10 flex flex-col md:flex-row items-center p-stack-md md:p-stack-lg gap-stack-md">
-            {/* Avatar / Badge Area */}
-            <div className="relative flex-shrink-0 group">
-              <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-2 border-[#D4AF37]/50 overflow-hidden relative shadow-[0_0_30px_rgba(212,175,55,0.2)]">
-                <img
-                  src={mainMvp.avatarUrl}
-                  alt={mainMvp.name}
-                  className="w-full h-full object-cover opacity-100 transition-all duration-500"
-                />
+        <section className="w-full max-w-3xl relative rounded-2xl overflow-hidden bg-gradient-to-b from-[#14120D] via-[#0C0B08] to-[#080808] border border-[#D4AF37]/50 shadow-[0_0_50px_rgba(212,175,55,0.15)] p-5 md:p-8 transition-all duration-300 hover:border-[#D4AF37]/75 hover:shadow-[0_0_60px_rgba(212,175,55,0.25)]">
+          {/* Volumetric Neon Ambient Glows */}
+          <div className="absolute -top-24 -left-24 w-80 h-80 bg-[#D4AF37]/20 blur-[110px] rounded-full pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-[#FF4D00]/15 blur-[120px] rounded-full pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#D4AF37]/10 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-[linear-gradient(115deg,transparent_20%,rgba(212,175,55,0.04)_45%,rgba(255,77,0,0.04)_50%,transparent_55%)] pointer-events-none" />
+
+          {/* Tactical Cybernetic Corner Accents */}
+          <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[#D4AF37] rounded-tl-sm pointer-events-none" />
+          <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[#D4AF37] rounded-tr-sm pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[#D4AF37] rounded-bl-sm pointer-events-none" />
+          <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[#D4AF37] rounded-br-sm pointer-events-none" />
+
+          {/* Header Badge */}
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-[#D4AF37]/20">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#D4AF37]/15 border border-[#D4AF37]/35 shadow-[0_0_15px_rgba(212,175,55,0.15)]">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F5D76E] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#D4AF37]" />
+              </span>
+              <span className="font-label-caps text-xs font-bold tracking-[0.2em] text-[#F5D76E] uppercase">
+                {mvpData.players.length > 1 ? "CO-MVP OF THE SESSION" : "👑 TOURNAMENT MVP"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="font-label-caps text-[11px] tracking-widest text-[#D4AF37]/80 font-mono uppercase bg-black/40 px-2.5 py-1 rounded border border-[#D4AF37]/20">
+                {sessionDateStr}
+              </span>
+            </div>
+          </div>
+
+          {/* Main Hero Card Body */}
+          <div className="relative z-10 flex flex-col md:flex-row items-center gap-6 md:gap-8">
+            {/* 3D Championship Avatar Pedestal */}
+            <div className="relative shrink-0 group">
+              <div className="relative flex items-center justify-center p-1 rounded-full bg-gradient-to-tr from-[#D4AF37] via-[#FFF3B0] to-[#996515] shadow-[0_0_35px_rgba(212,175,55,0.35)] group-hover:shadow-[0_0_45px_rgba(212,175,55,0.5)] transition-all duration-300">
+                <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden bg-[#0A0A0A] relative border-2 border-black">
+                  <img
+                    src={mainMvp.avatarUrl}
+                    alt={mainMvp.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
               </div>
-              <div className="absolute -bottom-4 -right-4 bg-surface-container border border-[#D4AF37] rounded-full p-3 shadow-lg flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
+
+              {/* Floating Crown Badge */}
+              <div className="absolute -bottom-2 -right-2 bg-[#120F08] border-2 border-[#D4AF37] rounded-full p-2 shadow-[0_0_20px_rgba(212,175,55,0.5)] flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
                 <span
-                  className="material-symbols-outlined text-[#D4AF37] text-3xl"
+                  className="material-symbols-outlined text-[#F5D76E] text-2xl"
                   style={{ fontVariationSettings: "'FILL' 1" }}
                 >
-                  workspace_premium
+                  military_tech
                 </span>
               </div>
             </div>
 
-            {/* MVP Details */}
-            <div className="flex-1 text-center md:text-left space-y-stack-sm">
-              <div className="inline-block px-3 py-1 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37] font-label-caps text-label-caps mb-2 shadow-[0_0_10px_rgba(212,175,55,0.1)]">
-                {mvpData.players.length > 1 ? "CO-MVP OF THE SESSION" : "LAST NIGHT'S MVP"}
-              </div>
-              <h2 className="font-headline text-headline-lg-mobile md:text-headline-lg text-on-surface uppercase tracking-tight">
+            {/* MVP Player Info & Summary */}
+            <div className="flex-1 text-center md:text-left space-y-2">
+              <span className="font-label-caps text-xs text-[#D4AF37]/80 tracking-widest uppercase font-mono">
+                TOP COMBAT PERFORMANCE
+              </span>
+              <h2 className="font-headline text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight bg-gradient-to-r from-white via-[#FCE99B] to-[#D4AF37] bg-clip-text text-transparent drop-shadow-[0_4px_16px_rgba(212,175,55,0.25)]">
                 {mvpData.players.map((p) => p.name).join(" & ")}
               </h2>
-              
-              <GoldenGunAward
-                totalKills={goldenGunData?.totalKills || 0}
-                winners={goldenGunData?.winners || []}
-              />
-
-              
-              <p className="font-body text-body-md text-on-surface-variant max-w-md">
-                Top fragger from last night's session. Unstoppable momentum.
+              <p className="font-body text-sm text-[#E5E2E1]/80 max-w-md">
+                Crowned MVP for outstanding frag count and round dominance in the latest competitive session.
               </p>
             </div>
 
+            {/* HUD Stat Showcase (Peak & Total Kills) */}
+            <div className="flex md:flex-col items-center md:items-end justify-center gap-3 shrink-0 border-t md:border-t-0 md:border-l border-[#D4AF37]/25 pt-4 md:pt-0 md:pl-6 w-full md:w-auto">
+              <div className="flex flex-col items-center md:items-end bg-black/40 px-4 py-2 rounded-xl border border-[#D4AF37]/20 shadow-inner">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-stat-value text-3xl sm:text-4xl font-extrabold text-[#F5D76E] font-mono drop-shadow-[0_0_12px_rgba(245,215,110,0.4)]">
+                    {mvpData.peakKills}
+                  </span>
+                  <span className="font-label-caps text-xs text-[#F5D76E] font-bold">
+                    FRAGS
+                  </span>
+                </div>
+                <span className="font-label-caps text-[10px] text-[#D4AF37]/80 tracking-widest uppercase mt-0.5">
+                  PEAK SINGLE MATCH
+                </span>
+              </div>
 
-            {/* Highlight Stat */}
-            <div className="flex flex-col items-center md:items-end md:ml-auto">
-              <span className="font-display-stat text-display-stat text-primary drop-shadow-[0_0_15px_rgba(255,181,158,0.3)]">
-                {mvpData.peakKills}
-              </span>
-              <span className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mt-1">
-                PEAK KILLS
-              </span>
+              {mainMvp.totalKills > 0 && (
+                <div className="flex flex-col items-center md:items-end bg-black/40 px-4 py-2 rounded-xl border border-[#D4AF37]/20 shadow-inner">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-stat-value text-2xl sm:text-3xl font-extrabold text-white font-mono">
+                      {mainMvp.totalKills}
+                    </span>
+                    <span className="font-label-caps text-xs text-[#E5E2E1]/70 font-bold">
+                      KILLS
+                    </span>
+                  </div>
+                  <span className="font-label-caps text-[10px] text-on-surface-variant tracking-widest uppercase mt-0.5">
+                    SESSION TOTAL
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -109,6 +156,15 @@ export default async function HomePage() {
           />
         </div>
       )}
+
+      {/* Standalone Golden Gun Award Banner */}
+      <section className="w-full max-w-3xl">
+        <GoldenGunAward
+          totalKills={goldenGunData?.totalKills || 0}
+          winners={goldenGunData?.winners || []}
+        />
+      </section>
+
 
       {/* Session Summary Grid */}
       <section className="w-full max-w-3xl space-y-stack-md">

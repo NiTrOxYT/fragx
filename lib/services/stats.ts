@@ -253,7 +253,7 @@ export function extractSessionSummaryFromSession(session: any) {
 }
 
 const getLatestPublishedSessionInternal = async () => {
-  const sessionWithMatches = await (prisma.gamingSession as any).findFirst({
+  const sessionWithMatches = await (prisma as any).gamingSession.findFirst({
     where: {
       status: "PUBLISHED",
       matches: {
@@ -317,7 +317,7 @@ const getLatestPublishedSessionInternal = async () => {
     return sessionWithMatches;
   }
 
-  return await (prisma.gamingSession as any).findFirst({
+  return await (prisma as any).gamingSession.findFirst({
     where: { status: "PUBLISHED" },
     orderBy: [
       { date: "desc" },
@@ -388,7 +388,7 @@ export const getGoldenGunAward = cache(async (sessionId?: string): Promise<Golde
     return extractGoldenGunFromSession(latestSession);
   }
 
-  const session = await (prisma.gamingSession as any).findUnique({
+  const session = await (prisma as any).gamingSession.findUnique({
     where: { id: sessionId },
     select: {
       id: true,
@@ -436,7 +436,7 @@ export const getMVP = cache(async (sessionId?: string): Promise<MVPResult | null
     return extractMVPFromSession(latestSession);
   }
 
-  const session = await (prisma.gamingSession as any).findUnique({
+  const session = await (prisma as any).gamingSession.findUnique({
     where: { id: sessionId },
     select: {
       id: true,
@@ -480,7 +480,7 @@ export const getSessionSummary = cache(async (sessionId?: string) => {
     return extractSessionSummaryFromSession(latestSession);
   }
 
-  const session = await (prisma.gamingSession as any).findUnique({
+  const session = await (prisma as any).gamingSession.findUnique({
     where: { id: sessionId },
     select: {
       id: true,
@@ -512,7 +512,7 @@ export const getRecentMatches = cache(async (sessionId?: string, limit = 10) => 
     return reversed.slice(0, limit);
   }
 
-  const matches = await (prisma.match as any).findMany({
+  const matches = await (prisma as any).match.findMany({
     where: {
       sessionId,
       session: {
@@ -566,7 +566,7 @@ export const getRecentMatches = cache(async (sessionId?: string, limit = 10) => 
  * Calculates cumulative Golden Gun awards won count for each player across ALL published sessions.
  */
 const getGoldenGunCountsInternal = async (): Promise<{ [playerId: string]: number }> => {
-  const publishedSessions = await (prisma.gamingSession as any).findMany({
+  const publishedSessions = await (prisma as any).gamingSession.findMany({
     where: {
       status: "PUBLISHED",
       matches: {
@@ -644,7 +644,7 @@ const getGoldenGunCountsInternal = async (): Promise<{ [playerId: string]: numbe
   }
 
   // Apply player manual adjustments
-  const players = await (prisma.player as any).findMany({
+  const players = await (prisma as any).player.findMany({
     select: { id: true, goldenGunAdjustment: true },
   });
 
@@ -677,7 +677,7 @@ const getLeaderboardInternal = async (filter: "ALL TIME" | "THIS MONTH" | "THIS 
   }
 
   const [allPlayers, goldenGunCounts, multiTeamMatchPlayers, legacyMatches] = await Promise.all([
-    (prisma.player as any).findMany({
+    (prisma as any).player.findMany({
       select: { id: true, name: true, avatarUrl: true },
     }),
     getGoldenGunCounts(),
@@ -700,7 +700,7 @@ const getLeaderboardInternal = async (filter: "ALL TIME" | "THIS MONTH" | "THIS 
         },
       },
     }),
-    (prisma.match as any).findMany({
+    (prisma as any).match.findMany({
       where: {
         playerId: { not: null },
         session: {
@@ -860,7 +860,7 @@ export interface TeamScoreboardData {
 
 const getScoreboardDataInternal = async (): Promise<TeamScoreboardData | null> => {
   // Fetch active teams
-  const activeTeams = await (prisma.team as any).findMany({
+  const activeTeams = await (prisma as any).team.findMany({
     where: { isActive: true },
     orderBy: { name: "asc" },
     take: 2,
@@ -868,7 +868,7 @@ const getScoreboardDataInternal = async (): Promise<TeamScoreboardData | null> =
   });
 
   if (activeTeams.length < 2) {
-    const allTeams = await (prisma.team as any).findMany({
+    const allTeams = await (prisma as any).team.findMany({
       orderBy: { name: "asc" },
       take: 2,
       select: { id: true, name: true, avatarUrl: true },
@@ -883,7 +883,7 @@ const getScoreboardDataInternal = async (): Promise<TeamScoreboardData | null> =
   const team1Info = activeTeams[0];
   const team2Info = activeTeams[1];
 
-  const publishedSessions = await (prisma.gamingSession as any).findMany({
+  const publishedSessions = await (prisma as any).gamingSession.findMany({
     where: {
       status: "PUBLISHED",
       matches: {
