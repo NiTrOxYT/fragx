@@ -171,10 +171,9 @@ export default async function HomePage() {
             {recentMatches.map((match: any) => {
               const isMultiTeam = match.matchTeams && match.matchTeams.length > 0;
               const topTeam = isMultiTeam ? match.matchTeams[0] : null;
-              const totalKills = isMultiTeam
-                ? match.matchTeams.reduce(
-                    (acc: number, mt: any) =>
-                      acc + mt.players.reduce((pAcc: number, p: any) => pAcc + p.kills, 0),
+              const winnerKills = isMultiTeam
+                ? (topTeam?.players || []).reduce(
+                    (pAcc: number, p: any) => pAcc + (p.kills || 0),
                     0
                   )
                 : match.kills || 0;
@@ -210,10 +209,11 @@ export default async function HomePage() {
                         </span>
                         <span className="w-1 h-1 rounded-full bg-outline-variant" />
                         <span className="font-label-caps text-[10px] text-primary/80">
-                          {totalKills} KILLS
+                          {winnerKills} KILLS
                         </span>
                       </div>
                     </div>
+
 
                     <div className="flex-shrink-0 px-3 py-1 rounded bg-surface-container-low border border-outline-variant/50 flex flex-col items-center justify-center">
                       <span className="font-label-caps text-[10px] text-on-surface-variant">
