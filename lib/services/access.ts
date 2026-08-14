@@ -1,25 +1,21 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { cryptoNative } from "@/lib/auth-crypto";
 
 const ACCESS_COOKIE_NAME = "fragx_access_session";
 
 /**
- * Verifies whether the current request has a valid access token cookie.
- * Valid tokens can belong to:
- * 1. Master Access Key (ACCESS_KEY environment variable)
- * 2. Any active Player's unique Access Key in database
- */
-/**
  * Retrieves the currently authenticated player/user from access session cookie.
+ * Wrapped with React cache() to prevent redundant DB queries per request context.
  */
-export async function getAuthenticatedPlayer(): Promise<{
+export const getAuthenticatedPlayer = cache(async (): Promise<{
   id: string;
   name: string;
   role: string;
   avatarUrl: string;
   isAdmin: boolean;
-} | null> {
+} | null> => {
   const cookieStore = cookies();
   const sessionToken = cookieStore.get(ACCESS_COOKIE_NAME)?.value;
 
@@ -29,13 +25,6 @@ export async function getAuthenticatedPlayer(): Promise<{
   const masterToken = cryptoNative(masterKey);
 
   if (sessionToken === masterToken) {
-    const adminPlayer = await (prisma.player as any).findFirst({
-      where: { role: "ADMIN", isActive: true },
-      select: { id: true, name: true, role: true, avatarUrl: true },
-    });
-    if (adminPlayer) {
-      return { ...adminPlayer, isAdmin: true };
-    }
     return { id: "master", name: "ADMIN", role: "ADMIN", avatarUrl: "", isAdmin: true };
   }
 
@@ -58,16 +47,29 @@ export async function getAuthenticatedPlayer(): Promise<{
   }
 
   return null;
-}
+});
 
 /**
  * Verifies whether the current request has a valid access token cookie.
+ * Wrapped with React cache() for instant 0-latency verification.
  */
-export async function verifyAccessAuth(): Promise<boolean> {
+export const verifyAccessAuth = cache(async (): Promise<boolean> => {
+  const cookieStore = cookies();
+  const sessionToken = cookieStore.get(ACCESS_COOKIE_NAME)?.value;
+
+  if (!sessionToken) return false;
+
+  const masterKey = process.env.ACCESS_KEY || "FRAGX2026";
+  const masterToken = cryptoNative(masterKey);
+
+  // Fast path: Master token matches directly without DB query
+  if (sessionToken === masterToken) {
+    return true;
+  }
+
   const player = await getAuthenticatedPlayer();
   return !!player;
-}
-
+});
 
 /**
  * Validates the provided Access Key against Master Key or Player Access Keys.

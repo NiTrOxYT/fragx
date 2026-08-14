@@ -180,8 +180,11 @@ export default async function HomePage() {
                       <img
                         src={match.screenshotUrl}
                         alt={`Match ${match.matchNumber}`}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity"
                       />
+
                       <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded" />
                     </div>
 

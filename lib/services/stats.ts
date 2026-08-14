@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 
 export interface MVPResult {
@@ -20,7 +21,7 @@ export interface GoldenGunAwardResult {
   totalKills: number;
 }
 
-export async function getLatestPublishedSession() {
+export const getLatestPublishedSession = cache(async () => {
   const sessionWithMatches = await (prisma.gamingSession as any).findFirst({
     where: {
       status: "PUBLISHED",
@@ -28,6 +29,7 @@ export async function getLatestPublishedSession() {
         some: {},
       },
     },
+
     orderBy: [
       { publishedAt: "desc" },
       { date: "desc" },
@@ -117,13 +119,15 @@ export async function getLatestPublishedSession() {
       },
     },
   });
-}
+});
+
 
 /**
  * Calculates Golden Gun Award: Highest CUMULATIVE TOTAL KILLS across the ENTIRE Gaming Session.
  * Handles ties by returning all players who achieved that max total session kills.
  */
-export async function getGoldenGunAward(sessionId?: string): Promise<GoldenGunAwardResult | null> {
+export const getGoldenGunAward = cache(async (sessionId?: string): Promise<GoldenGunAwardResult | null> => {
+
   let session;
   if (sessionId) {
     session = await (prisma.gamingSession as any).findUnique({
@@ -223,10 +227,11 @@ export async function getGoldenGunAward(sessionId?: string): Promise<GoldenGunAw
     })),
     totalKills: maxTotalKills,
   };
-}
+});
 
 
-export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
+export const getMVP = cache(async (sessionId?: string): Promise<MVPResult | null> => {
+
   let session;
   if (sessionId) {
     session = await (prisma.gamingSession as any).findUnique({
@@ -363,9 +368,11 @@ export async function getMVP(sessionId?: string): Promise<MVPResult | null> {
     })),
     peakKills: maxSingleMatchKills,
   };
-}
+});
 
-export async function getSessionSummary(sessionId?: string) {
+
+export const getSessionSummary = cache(async (sessionId?: string) => {
+
   let session;
   if (sessionId) {
     session = await (prisma.gamingSession as any).findUnique({
@@ -425,9 +432,11 @@ export async function getSessionSummary(sessionId?: string) {
     totalKills,
     winRate,
   };
-}
+});
 
-export async function getRecentMatches(limit = 10) {
+
+export const getRecentMatches = cache(async (limit = 10) => {
+
   const matches = await (prisma.match as any).findMany({
     where: {
       session: {
@@ -472,9 +481,11 @@ export async function getRecentMatches(limit = 10) {
   });
 
   return matches;
-}
+});
 
-export async function getLeaderboard(filter: "ALL TIME" | "THIS MONTH" | "THIS WEEK" = "ALL TIME") {
+
+export const getLeaderboard = cache(async (filter: "ALL TIME" | "THIS MONTH" | "THIS WEEK" = "ALL TIME") => {
+
   const now = new Date();
   let startDate: Date | undefined;
 
@@ -621,4 +632,5 @@ export async function getLeaderboard(filter: "ALL TIME" | "THIS MONTH" | "THIS W
     rank: index + 1,
     ...item,
   }));
-}
+});
+

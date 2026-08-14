@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { formatSessionDate } from "@/lib/utils/dates";
 import { getOrCreateSessionForDate } from "@/lib/services/sessions";
@@ -17,7 +18,8 @@ export interface CreateMultiTeamMatchInput {
   }[];
 }
 
-export async function getMatchById(id: string) {
+export const getMatchById = cache(async (id: string) => {
+
   const match = await (prisma.match as any).findUnique({
     where: { id },
     select: {
@@ -66,10 +68,12 @@ export async function getMatchById(id: string) {
   });
 
   return match;
-}
+});
 
-export async function getGroupedMatchHistory() {
+
+export const getGroupedMatchHistory = cache(async () => {
   const matches = await (prisma.match as any).findMany({
+
     where: {
       session: {
         status: "PUBLISHED",
@@ -137,7 +141,8 @@ export async function getGroupedMatchHistory() {
   }));
 
   return result;
-}
+});
+
 
 /**
  * Creates a multi-team match atomically using a Prisma Transaction.

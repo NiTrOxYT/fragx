@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 
 export interface TeamRecord {
@@ -8,7 +9,7 @@ export interface TeamRecord {
   createdAt: Date;
 }
 
-export async function getAllTeams(): Promise<TeamRecord[]> {
+export const getAllTeams = cache(async (): Promise<TeamRecord[]> => {
   const teams = await (prisma.team as any).findMany({
     orderBy: { name: "asc" },
     select: {
@@ -29,9 +30,10 @@ export async function getAllTeams(): Promise<TeamRecord[]> {
     playerCount: t._count?.teams || 0,
     createdAt: t.createdAt,
   }));
-}
+});
 
-export async function getActiveTeams(): Promise<TeamRecord[]> {
+export const getActiveTeams = cache(async (): Promise<TeamRecord[]> => {
+
   return await (prisma.team as any).findMany({
     where: { isActive: true },
     orderBy: { name: "asc" },
@@ -42,7 +44,8 @@ export async function getActiveTeams(): Promise<TeamRecord[]> {
       createdAt: true,
     },
   });
-}
+});
+
 
 export async function createTeam(name: string): Promise<TeamRecord> {
   const trimmedName = name.trim();

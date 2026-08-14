@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { cryptoNative } from "@/lib/auth-crypto";
 
@@ -11,7 +12,7 @@ export interface PlayerRecord {
   isActive: boolean;
 }
 
-export async function getAllPlayers(): Promise<PlayerRecord[]> {
+export const getAllPlayers = cache(async (): Promise<PlayerRecord[]> => {
   return await (prisma.player as any).findMany({
     select: {
       id: true,
@@ -22,9 +23,10 @@ export async function getAllPlayers(): Promise<PlayerRecord[]> {
     },
     orderBy: { name: "asc" },
   });
-}
+});
 
-export async function getPlayerById(id: string) {
+export const getPlayerById = cache(async (id: string) => {
+
   const [player, legacyMatches, multiTeamMatchPlayers] = await Promise.all([
     (prisma.player as any).findUnique({
       where: { id },
@@ -138,7 +140,8 @@ export async function getPlayerById(id: string) {
     performance,
     recentMatches: combinedMatches.slice(0, 10),
   };
-}
+});
+
 
 
 export async function createPlayer(

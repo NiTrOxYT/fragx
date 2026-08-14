@@ -1,11 +1,8 @@
-const CACHE_NAME = "fragx-v1";
+const CACHE_NAME = "fragx-v2";
 const ASSETS_TO_CACHE = [
-  "/",
-  "/matches",
-  "/leaderboard",
-  "/players",
   "/manifest.json",
-  "/globals.css",
+  "/images/logo.png",
+  "/images/preview.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -33,7 +30,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Ignore API requests and non-GET requests
+  // Ignore non-GET, API requests, and admin pages
   if (
     event.request.method !== "GET" ||
     event.request.url.includes("/api/") ||
@@ -42,15 +39,27 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Network-First for HTML navigation requests (ensures fresh live stats)
+  if (
+    event.request.mode === "navigate" ||
+    (event.request.headers.get("accept") &&
+      event.request.headers.get("accept").includes("text/html"))
+  ) {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        return caches.match(event.request).then((cached) => cached || caches.match("/"));
+      })
+    );
+    return;
+  }
+
+  // Cache-First for static assets (images, fonts, css, js)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
-      return fetch(event.request).catch(() => {
-        // Fallback response for offline navigation if needed
-        return caches.match("/");
-      });
+      return fetch(event.request);
     })
   );
 });
