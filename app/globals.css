@@ -94,3 +94,16 @@ body {
   padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
 }
 
+@keyframes fragx-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+

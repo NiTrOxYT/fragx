@@ -4,6 +4,7 @@ import "./globals.css";
 import TopHeader from "@/components/layout/TopHeader";
 import MobileNav from "@/components/layout/MobileNav";
 import PwaRegister from "@/components/common/PwaRegister";
+import InitialLoader from "@/components/common/InitialLoader";
 import { verifyAccessAuth } from "@/lib/services/access";
 import AccessGateClient from "@/components/common/AccessGateClient";
 
@@ -97,6 +98,7 @@ export default async function RootLayout({
         />
       </head>
       <body className={`bg-background text-on-background min-h-screen antialiased flex flex-col font-body selection:bg-primary-container selection:text-white ${hankenGrotesk.className}`}>
+        <InitialLoader />
         <PwaRegister />
         {isAccessAuthorized ? (
           <>
@@ -111,4 +113,5 @@ export default async function RootLayout({
     </html>
   );
 }
+
 
