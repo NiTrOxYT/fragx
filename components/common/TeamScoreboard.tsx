@@ -133,9 +133,24 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                   {/* Team 1 Header */}
                   <div className="flex items-center gap-3 sm:gap-5">
                     {/* Machined Hardware Shield */}
-                    <div className="relative w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-xl sm:rounded-2xl p-1 bg-gradient-to-br from-cyan-400 via-blue-600 to-transparent ring-1 ring-cyan-300/40 shadow-[0_0_25px_rgba(6,182,212,0.5)] flex-shrink-0 flex items-center justify-center">
-                      <div className="w-full h-full rounded-[0.65rem] sm:rounded-[0.85rem] bg-[#030914] flex items-center justify-center">
-                        <span className={`text-xl sm:text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-cyan-200 to-cyan-400 ${syne.className}`}>
+                    <div className="relative w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-xl sm:rounded-2xl p-1 bg-gradient-to-br from-cyan-400 via-blue-600 to-transparent ring-1 ring-cyan-300/40 shadow-[0_0_25px_rgba(6,182,212,0.5)] flex-shrink-0 flex items-center justify-center overflow-hidden">
+                      <div className="w-full h-full rounded-[0.65rem] sm:rounded-[0.85rem] bg-[#030914] flex items-center justify-center overflow-hidden relative">
+                        {team1.avatarUrl ? (
+                          <img
+                            src={team1.avatarUrl}
+                            alt={team1.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                              const fallback = (e.target as HTMLElement).parentElement?.querySelector('.team-fallback-initial') as HTMLElement;
+                              if (fallback) fallback.style.display = "flex";
+                            }}
+                          />
+                        ) : null}
+                        <span 
+                          className={`team-fallback-initial text-xl sm:text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-cyan-200 to-cyan-400 ${syne.className}`}
+                          style={{ display: team1.avatarUrl ? "none" : "flex" }}
+                        >
                           {team1.initial}
                         </span>
                       </div>
@@ -243,14 +258,30 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                     </div>
 
                     {/* Machined Hardware Shield */}
-                    <div className="relative w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-xl sm:rounded-2xl p-1 bg-gradient-to-br from-amber-300 via-yellow-500 to-transparent ring-1 ring-amber-300/40 shadow-[0_0_25px_rgba(245,158,11,0.5)] flex-shrink-0 flex items-center justify-center">
-                      <div className="w-full h-full rounded-[0.65rem] sm:rounded-[0.85rem] bg-[#120D02] flex items-center justify-center">
-                        <span className={`text-xl sm:text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-amber-200 to-amber-400 ${syne.className}`}>
+                    <div className="relative w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-xl sm:rounded-2xl p-1 bg-gradient-to-br from-amber-300 via-yellow-500 to-transparent ring-1 ring-amber-300/40 shadow-[0_0_25px_rgba(245,158,11,0.5)] flex-shrink-0 flex items-center justify-center overflow-hidden">
+                      <div className="w-full h-full rounded-[0.65rem] sm:rounded-[0.85rem] bg-[#120D02] flex items-center justify-center overflow-hidden relative">
+                        {team2.avatarUrl ? (
+                          <img
+                            src={team2.avatarUrl}
+                            alt={team2.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                              const fallback = (e.target as HTMLElement).parentElement?.querySelector('.team2-fallback-initial') as HTMLElement;
+                              if (fallback) fallback.style.display = "flex";
+                            }}
+                          />
+                        ) : null}
+                        <span 
+                          className={`team2-fallback-initial text-xl sm:text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-amber-200 to-amber-400 ${syne.className}`}
+                          style={{ display: team2.avatarUrl ? "none" : "flex" }}
+                        >
                           {team2.initial}
                         </span>
                       </div>
                     </div>
                   </div>
+
 
                   {/* Giant Score Node */}
                   <div className="flex items-end justify-between pt-3 border-t border-amber-500/20 flex-row-reverse">

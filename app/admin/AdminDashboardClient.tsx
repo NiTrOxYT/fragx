@@ -26,6 +26,7 @@ export interface AdminTeamPlayer {
 export interface AdminTeam {
   id: string;
   name: string;
+  avatarUrl?: string | null;
   isActive: boolean;
   players?: AdminTeamPlayer[];
   playerCount?: number;
@@ -105,8 +106,19 @@ export default function AdminDashboardClient({
   const [teams, setTeams] = useState<AdminTeam[]>(initialTeams);
   const [showAddTeam, setShowAddTeam] = useState(false);
   const [newTeamName, setNewTeamName] = useState("");
+  const [newTeamAvatarUrl, setNewTeamAvatarUrl] = useState("");
+  const [newTeamImageError, setNewTeamImageError] = useState(false);
   const [teamActionMsg, setTeamActionMsg] = useState("");
   const [loadingTeamId, setLoadingTeamId] = useState<string | null>(null);
+
+  // Edit Team Modal state
+  const [editingTeam, setEditingTeam] = useState<AdminTeam | null>(null);
+  const [editTeamName, setEditTeamName] = useState("");
+  const [editTeamAvatarUrl, setEditTeamAvatarUrl] = useState("");
+  const [editTeamIsActive, setEditTeamIsActive] = useState(true);
+  const [editTeamImageError, setEditTeamImageError] = useState(false);
+  const [editTeamSaving, setEditTeamSaving] = useState(false);
+  const [editTeamErrorMsg, setEditTeamErrorMsg] = useState("");
 
   // Team Players Management Modal state
   const [teamToManage, setTeamToManage] = useState<AdminTeam | null>(null);
@@ -120,6 +132,7 @@ export default function AdminDashboardClient({
     player: AdminTeamPlayer;
     targetTeam: AdminTeam;
   } | null>(null);
+
 
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -329,18 +342,28 @@ export default function AdminDashboardClient({
     const trimmed = newTeamName.trim();
     if (!trimmed) return;
 
+    if (newTeamAvatarUrl.trim() && !newTeamAvatarUrl.trim().startsWith("https://") && !newTeamAvatarUrl.trim().startsWith("data:image/")) {
+      setTeamActionMsg("Avatar URL must start with https://");
+      return;
+    }
+
     setTeamActionMsg("");
     try {
       const res = await fetch("/api/teams", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({
+          name: trimmed,
+          avatarUrl: newTeamAvatarUrl.trim() || null,
+        }),
       });
 
       const data = await res.json();
       if (res.ok && data.team) {
         setTeams((prev) => [...prev, data.team]);
         setNewTeamName("");
+        setNewTeamAvatarUrl("");
+        setNewTeamImageError(false);
         setShowAddTeam(false);
         setTeamActionMsg("Team created successfully.");
       } else {
@@ -350,6 +373,69 @@ export default function AdminDashboardClient({
       setTeamActionMsg("Error creating team.");
     }
   };
+
+  // Open Edit Team Modal
+  const handleOpenEditTeamModal = (team: AdminTeam) => {
+    setEditingTeam(team);
+    setEditTeamName(team.name);
+    setEditTeamAvatarUrl(team.avatarUrl || "");
+    setEditTeamIsActive(team.isActive);
+    setEditTeamImageError(false);
+    setEditTeamErrorMsg("");
+  };
+
+  // Save Edited Team
+  const handleSaveEditTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTeam) return;
+    const trimmed = editTeamName.trim();
+    if (!trimmed) return;
+
+    if (editTeamAvatarUrl.trim() && !editTeamAvatarUrl.trim().startsWith("https://") && !editTeamAvatarUrl.trim().startsWith("data:image/")) {
+      setEditTeamErrorMsg("Avatar URL must start with https://");
+      return;
+    }
+
+    setEditTeamSaving(true);
+    setEditTeamErrorMsg("");
+
+    try {
+      const res = await fetch(`/api/teams/${editingTeam.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: trimmed,
+          avatarUrl: editTeamAvatarUrl.trim() || null,
+          isActive: editTeamIsActive,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.team) {
+        setTeams((prev) =>
+          prev.map((t) =>
+            t.id === editingTeam.id
+              ? {
+                  ...t,
+                  name: data.team.name,
+                  avatarUrl: data.team.avatarUrl || null,
+                  isActive: data.team.isActive,
+                }
+              : t
+          )
+        );
+        setEditingTeam(null);
+        setTeamActionMsg("Team updated successfully.");
+      } else {
+        setEditTeamErrorMsg(data.error || "Failed to update team.");
+      }
+    } catch (err) {
+      setEditTeamErrorMsg("Error updating team.");
+    } finally {
+      setEditTeamSaving(false);
+    }
+  };
+
 
   // Update team active status
   const handleUpdateTeam = async (id: string, updates: { name?: string; isActive?: boolean }) => {
@@ -1332,20 +1418,67 @@ export default function AdminDashboardClient({
                 Create New Team
               </h4>
 
-              <div className="space-y-1 max-w-md">
-                <label className="font-label-caps text-xs text-on-surface-variant uppercase">
-                  Team Name
-                </label>
-                <input
-                  type="text"
-                  value={newTeamName}
-                  onChange={(e) => setNewTeamName(e.target.value)}
-                  placeholder="e.g. FRAGX Alpha"
-                  required
-                  minLength={2}
-                  maxLength={40}
-                  className="w-full bg-surface-container border border-surface-container-high rounded-lg px-3 py-2.5 font-label-caps text-label-caps text-on-surface focus:outline-none focus:border-primary"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_120px] gap-4 items-start">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="font-label-caps text-xs text-on-surface-variant uppercase">
+                      Team Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={newTeamName}
+                      onChange={(e) => setNewTeamName(e.target.value)}
+                      placeholder="e.g. TEAM LION"
+                      required
+                      minLength={2}
+                      maxLength={40}
+                      className="w-full bg-surface-container border border-surface-container-high rounded-lg px-3 py-2.5 font-label-caps text-label-caps text-on-surface focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-label-caps text-xs text-on-surface-variant uppercase">
+                      Team Avatar URL (HTTPS)
+                    </label>
+                    <input
+                      type="url"
+                      value={newTeamAvatarUrl}
+                      onChange={(e) => {
+                        setNewTeamAvatarUrl(e.target.value);
+                        setNewTeamImageError(false);
+                      }}
+                      placeholder="https://example.com/team-lion.png"
+                      className="w-full bg-surface-container border border-surface-container-high rounded-lg px-3 py-2.5 font-label-caps text-label-caps text-on-surface focus:outline-none focus:border-primary"
+                    />
+                    <span className="text-[11px] text-on-surface-variant/60 block">
+                      Optional hosted HTTPS image. Clean initial icon used as fallback.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Live Preview Box */}
+                <div className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-surface-container border border-surface-container-high">
+                  <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">
+                    Preview
+                  </span>
+                  <div className="w-16 h-16 rounded-xl bg-[#030914] border border-primary/30 p-1 flex items-center justify-center overflow-hidden shadow-[0_0_15px_rgba(255,77,0,0.15)] relative">
+                    {newTeamAvatarUrl.trim() && !newTeamImageError ? (
+                      <img
+                        src={newTeamAvatarUrl.trim()}
+                        alt="Preview"
+                        className="w-full h-full object-cover rounded-lg"
+                        onError={() => setNewTeamImageError(true)}
+                      />
+                    ) : (
+                      <span className="font-headline text-2xl font-extrabold text-primary uppercase">
+                        {newTeamName.trim() ? newTeamName.trim().charAt(0).toUpperCase() : "T"}
+                      </span>
+                    )}
+                  </div>
+                  {newTeamImageError && (
+                    <span className="text-[10px] text-error font-bold">Image Failed</span>
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-end pt-2 gap-3">
@@ -1377,9 +1510,29 @@ export default function AdminDashboardClient({
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-bold shrink-0">
-                        <span className="material-symbols-outlined text-2xl">shield</span>
+                    <div className="flex items-center gap-3.5">
+                      {/* Hexagonal/Angular Esports Shield Frame */}
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary/30 via-surface-container to-transparent border border-primary/40 p-1 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(255,77,0,0.2)] overflow-hidden relative">
+                        <div className="w-full h-full rounded-lg bg-[#040812] flex items-center justify-center overflow-hidden relative">
+                          {t.avatarUrl ? (
+                            <img
+                              src={t.avatarUrl}
+                              alt={t.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = "none";
+                                const fallback = (e.target as HTMLElement).parentElement?.querySelector('.team-card-fallback') as HTMLElement;
+                                if (fallback) fallback.style.display = "flex";
+                              }}
+                            />
+                          ) : null}
+                          <span
+                            className="team-card-fallback font-headline text-xl font-extrabold text-primary uppercase"
+                            style={{ display: t.avatarUrl ? "none" : "flex" }}
+                          >
+                            {t.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
                       </div>
 
                       <div>
@@ -1398,6 +1551,17 @@ export default function AdminDashboardClient({
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                      {/* EDIT Team Button */}
+                      <button
+                        onClick={() => handleOpenEditTeamModal(t)}
+                        disabled={loadingTeamId === t.id}
+                        className="font-label-caps text-xs px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high border border-primary/40 text-primary flex items-center gap-1 transition-colors font-bold"
+                        title="Edit Team"
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                        EDIT
+                      </button>
+
                       {/* Active Toggle Switch */}
                       <button
                         onClick={() => handleUpdateTeam(t.id, { isActive: !t.isActive })}
@@ -1480,6 +1644,129 @@ export default function AdminDashboardClient({
 
       {/* Edit Player Modal Portal */}
       {editModalContent && createPortal(editModalContent, document.body)}
+
+      {/* Edit Team Modal Portal */}
+      {editingTeam &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+            <div className="w-full max-w-md bg-[#171717]/95 border border-primary/40 rounded-2xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-surface-container-high pb-3">
+                <div className="flex items-center gap-2 text-primary">
+                  <span className="material-symbols-outlined text-2xl">edit_note</span>
+                  <h3 className="font-headline text-headline-sm text-on-surface uppercase">
+                    EDIT TEAM
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingTeam(null)}
+                  className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg"
+                >
+                  <span className="material-symbols-outlined text-xl">close</span>
+                </button>
+              </div>
+
+              {editTeamErrorMsg && (
+                <div className="p-3 rounded-lg bg-error/10 border border-error/30 text-error font-body text-xs text-center">
+                  {editTeamErrorMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveEditTeam} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="font-label-caps text-xs text-on-surface-variant uppercase">
+                    Team Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={editTeamName}
+                    onChange={(e) => setEditTeamName(e.target.value)}
+                    required
+                    minLength={2}
+                    maxLength={40}
+                    className="w-full bg-surface-container border border-surface-container-high rounded-xl px-4 py-2.5 font-label-caps text-label-caps text-on-surface focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-label-caps text-xs text-on-surface-variant uppercase">
+                    Team Avatar URL (HTTPS)
+                  </label>
+                  <input
+                    type="url"
+                    value={editTeamAvatarUrl}
+                    onChange={(e) => {
+                      setEditTeamAvatarUrl(e.target.value);
+                      setEditTeamImageError(false);
+                    }}
+                    placeholder="https://example.com/team-lion.png"
+                    className="w-full bg-surface-container border border-surface-container-high rounded-xl px-4 py-2.5 font-label-caps text-label-caps text-on-surface focus:outline-none focus:border-primary"
+                  />
+                  <span className="text-[11px] text-on-surface-variant/60 block">
+                    Optional hosted HTTPS image. Leave empty to use initial icon.
+                  </span>
+                </div>
+
+                {/* Live Preview */}
+                <div className="flex items-center gap-4 p-3 rounded-xl bg-surface-container border border-surface-container-high">
+                  <div className="w-14 h-14 rounded-xl bg-[#030914] border border-primary/30 p-1 flex items-center justify-center overflow-hidden shadow-[0_0_15px_rgba(255,77,0,0.2)] shrink-0 relative">
+                    {editTeamAvatarUrl.trim() && !editTeamImageError ? (
+                      <img
+                        src={editTeamAvatarUrl.trim()}
+                        alt="Preview"
+                        className="w-full h-full object-cover rounded-lg"
+                        onError={() => setEditTeamImageError(true)}
+                      />
+                    ) : (
+                      <span className="font-headline text-xl font-extrabold text-primary uppercase">
+                        {editTeamName.trim() ? editTeamName.trim().charAt(0).toUpperCase() : "T"}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="font-label-caps text-xs text-on-surface block font-bold">
+                      {editTeamName || "Team Name"}
+                    </span>
+                    <span className="text-[11px] text-on-surface-variant/70 block mt-0.5">
+                      {editTeamImageError
+                        ? "⚠️ Image URL failed to load"
+                        : editTeamAvatarUrl.trim()
+                        ? "✓ Custom Avatar Active"
+                        : "Fallback initial icon active"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-surface-container-high">
+                  <button
+                    type="button"
+                    onClick={() => setEditingTeam(null)}
+                    className="px-4 py-2.5 rounded-xl border border-surface-container-high text-on-surface-variant font-label-caps text-xs hover:text-on-surface transition-colors"
+                  >
+                    CANCEL
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={editTeamSaving}
+                    className="px-6 py-2.5 rounded-xl bg-primary-cta text-white font-label-caps text-xs font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(255,77,0,0.3)] hover:bg-primary-container disabled:opacity-50 transition-all flex items-center gap-2"
+                  >
+                    {editTeamSaving && (
+                      <span className="material-symbols-outlined text-sm animate-spin">
+                        progress_activity
+                      </span>
+                    )}
+                    SAVE CHANGES
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
+
 
       {/* Manage Team Players Modal Portal */}
       {teamToManage &&

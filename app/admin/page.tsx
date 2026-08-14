@@ -37,10 +37,12 @@ export default async function AdminDashboardPage() {
       initialTeams={teams.map((t) => ({
         id: t.id,
         name: t.name,
+        avatarUrl: t.avatarUrl || null,
         isActive: t.isActive,
         players: t.players || [],
         playerCount: t.players?.length || 0,
       }))}
+
 
       stats={{
         totalMatches: summary.matchCount,

@@ -49,7 +49,7 @@ export const getMatchById = cache(async (id: string) => {
           id: true,
           placement: true,
           team: {
-            select: { id: true, name: true },
+            select: { id: true, name: true, avatarUrl: true },
           },
           players: {
             select: {
@@ -102,7 +102,7 @@ export const getGroupedMatchHistory = cache(async () => {
           id: true,
           placement: true,
           team: {
-            select: { id: true, name: true },
+            select: { id: true, name: true, avatarUrl: true },
           },
           players: {
             select: {
@@ -276,7 +276,7 @@ export async function getAllAdminMatches(): Promise<AdminMatchItem[]> {
           id: true,
           placement: true,
           team: {
-            select: { id: true, name: true },
+            select: { id: true, name: true, avatarUrl: true },
           },
           players: {
             select: { kills: true },

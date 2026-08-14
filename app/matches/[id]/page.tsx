@@ -25,7 +25,9 @@ export default async function MatchDetailsPage({ params }: MatchDetailsPageProps
   const matchTeams = match.matchTeams?.map((mt: any) => ({
     id: mt.id,
     teamName: mt.team.name,
+    avatarUrl: mt.team.avatarUrl || null,
     placement: mt.placement,
+
     players: mt.players.map((mp: any) => ({
       id: mp.player.id,
       name: mp.player.name,

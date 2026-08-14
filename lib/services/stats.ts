@@ -731,6 +731,7 @@ export interface TeamScoreboardData {
     id: string;
     name: string;
     initial: string;
+    avatarUrl?: string | null;
     sessionWins: number;
     tonightMatchesWon: number;
     totalKills: number;
@@ -739,6 +740,7 @@ export interface TeamScoreboardData {
     id: string;
     name: string;
     initial: string;
+    avatarUrl?: string | null;
     sessionWins: number;
     tonightMatchesWon: number;
     totalKills: number;
@@ -756,14 +758,14 @@ export const getScoreboardData = cache(async (): Promise<TeamScoreboardData | nu
     where: { isActive: true },
     orderBy: { name: "asc" },
     take: 2,
-    select: { id: true, name: true },
+    select: { id: true, name: true, avatarUrl: true },
   });
 
   if (activeTeams.length < 2) {
     const allTeams = await (prisma.team as any).findMany({
       orderBy: { name: "asc" },
       take: 2,
-      select: { id: true, name: true },
+      select: { id: true, name: true, avatarUrl: true },
     });
 
     if (allTeams.length < 2) {
@@ -874,6 +876,7 @@ export const getScoreboardData = cache(async (): Promise<TeamScoreboardData | nu
       id: team1Info.id,
       name: team1Info.name,
       initial: team1Info.name.charAt(0).toUpperCase(),
+      avatarUrl: team1Info.avatarUrl || null,
       sessionWins: team1SessionWins,
       tonightMatchesWon: team1TonightMatchWins,
       totalKills: team1TotalKills,
@@ -882,6 +885,7 @@ export const getScoreboardData = cache(async (): Promise<TeamScoreboardData | nu
       id: team2Info.id,
       name: team2Info.name,
       initial: team2Info.name.charAt(0).toUpperCase(),
+      avatarUrl: team2Info.avatarUrl || null,
       sessionWins: team2SessionWins,
       tonightMatchesWon: team2TonightMatchWins,
       totalKills: team2TotalKills,
@@ -893,6 +897,7 @@ export const getScoreboardData = cache(async (): Promise<TeamScoreboardData | nu
     latestSessionDateStr: latestDateStr,
   };
 });
+
 
 
 

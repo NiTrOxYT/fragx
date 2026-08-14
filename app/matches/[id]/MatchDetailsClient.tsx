@@ -13,6 +13,7 @@ interface MatchTeamPlayer {
 interface MatchTeamDetail {
   id: string;
   teamName: string;
+  avatarUrl?: string | null;
   placement: number;
   players: MatchTeamPlayer[];
 }
@@ -135,10 +136,22 @@ export default function MatchDetailsClient({
                   className="glass-panel rounded-xl p-4 border border-surface-container-high space-y-3"
                 >
                   <div className="flex justify-between items-center border-b border-surface-container-high pb-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                       <span className="font-headline text-headline-sm text-gold font-bold">
                         #{team.placement}
                       </span>
+                      {team.avatarUrl ? (
+                        <div className="w-7 h-7 rounded-lg border border-primary/40 bg-[#030914] overflow-hidden shrink-0">
+                          <img
+                            src={team.avatarUrl}
+                            alt={team.teamName}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        </div>
+                      ) : null}
                       <h4 className="font-headline text-headline-sm text-on-surface">
                         {team.teamName}
                       </h4>
@@ -148,6 +161,7 @@ export default function MatchDetailsClient({
                       {team.players.reduce((acc, p) => acc + p.kills, 0)} TEAM KILLS
                     </span>
                   </div>
+
 
                   <div className="space-y-2">
                     {team.players.map((p) => {

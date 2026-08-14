@@ -14,10 +14,20 @@ export interface TeamPlayerSummary {
 export interface TeamRecord {
   id: string;
   name: string;
+  avatarUrl?: string | null;
   isActive: boolean;
   players?: TeamPlayerSummary[];
   playerCount?: number;
   createdAt: Date;
+}
+
+function validateAvatarUrl(url?: string | null): string | null {
+  if (!url || !url.trim()) return null;
+  const trimmed = url.trim();
+  if (!trimmed.startsWith("https://") && !trimmed.startsWith("data:image/")) {
+    throw new Error("Team avatar URL must start with https://");
+  }
+  return trimmed;
 }
 
 export const getAllTeams = cache(async (): Promise<TeamRecord[]> => {
@@ -26,6 +36,7 @@ export const getAllTeams = cache(async (): Promise<TeamRecord[]> => {
     select: {
       id: true,
       name: true,
+      avatarUrl: true,
       isActive: true,
       createdAt: true,
       players: {
@@ -45,6 +56,7 @@ export const getAllTeams = cache(async (): Promise<TeamRecord[]> => {
   return teams.map((t: any) => ({
     id: t.id,
     name: t.name,
+    avatarUrl: t.avatarUrl || null,
     isActive: t.isActive,
     players: (t.players || []).map((p: any) => ({
       id: p.id,
@@ -67,6 +79,7 @@ export const getActiveTeams = cache(async (): Promise<TeamRecord[]> => {
     select: {
       id: true,
       name: true,
+      avatarUrl: true,
       isActive: true,
       createdAt: true,
       players: {
@@ -87,6 +100,7 @@ export const getActiveTeams = cache(async (): Promise<TeamRecord[]> => {
   return teams.map((t: any) => ({
     id: t.id,
     name: t.name,
+    avatarUrl: t.avatarUrl || null,
     isActive: t.isActive,
     players: (t.players || []).map((p: any) => ({
       id: p.id,
@@ -108,6 +122,7 @@ export async function getTeamWithPlayers(teamId: string) {
     select: {
       id: true,
       name: true,
+      avatarUrl: true,
       isActive: true,
       players: {
         orderBy: { name: "asc" },
@@ -172,6 +187,7 @@ export async function getTeamWithPlayers(teamId: string) {
     team: {
       id: team.id,
       name: team.name,
+      avatarUrl: team.avatarUrl || null,
       isActive: team.isActive,
     },
     currentPlayers,
@@ -220,21 +236,25 @@ export async function removePlayerFromTeam(teamId: string, playerId: string) {
   return getTeamWithPlayers(teamId);
 }
 
-export async function createTeam(name: string): Promise<TeamRecord> {
-  const trimmedName = name.trim();
+export async function createTeam(data: { name: string; avatarUrl?: string | null }): Promise<TeamRecord> {
+  const trimmedName = data.name.trim();
   if (!trimmedName || trimmedName.length < 2 || trimmedName.length > 40) {
     throw new Error("Team name must be between 2 and 40 characters.");
   }
+
+  const validatedAvatar = validateAvatarUrl(data.avatarUrl);
 
   try {
     const team = await (prisma.team as any).create({
       data: {
         name: trimmedName,
+        avatarUrl: validatedAvatar,
         isActive: true,
       },
       select: {
         id: true,
         name: true,
+        avatarUrl: true,
         isActive: true,
         createdAt: true,
       },
@@ -255,7 +275,7 @@ export async function createTeam(name: string): Promise<TeamRecord> {
 
 export async function updateTeam(
   id: string,
-  data: { name?: string; isActive?: boolean }
+  data: { name?: string; avatarUrl?: string | null; isActive?: boolean }
 ): Promise<TeamRecord> {
   const updateData: any = {};
   if (data.name !== undefined) {
@@ -264,6 +284,9 @@ export async function updateTeam(
       throw new Error("Team name must be between 2 and 40 characters.");
     }
     updateData.name = trimmed;
+  }
+  if (data.avatarUrl !== undefined) {
+    updateData.avatarUrl = validateAvatarUrl(data.avatarUrl);
   }
   if (data.isActive !== undefined) {
     updateData.isActive = data.isActive;
@@ -276,6 +299,7 @@ export async function updateTeam(
       select: {
         id: true,
         name: true,
+        avatarUrl: true,
         isActive: true,
         createdAt: true,
         players: {
@@ -294,6 +318,7 @@ export async function updateTeam(
     return {
       id: team.id,
       name: team.name,
+      avatarUrl: team.avatarUrl || null,
       isActive: team.isActive,
       players: team.players || [],
       playerCount: team.players?.length || 0,
