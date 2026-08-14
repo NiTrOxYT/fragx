@@ -727,7 +727,6 @@ export const getLeaderboard = cache(
 );
 
 export interface TeamScoreboardData {
-
   team1: {
     id: string;
     name: string;
@@ -746,6 +745,7 @@ export interface TeamScoreboardData {
   };
   tonightMatchCount: number;
   totalTournamentMatches: number;
+  matchesRemaining: number;
   totalSessionsPlayed: number;
   latestSessionDateStr: string;
 }
@@ -866,6 +866,9 @@ export const getScoreboardData = cache(async (): Promise<TeamScoreboardData | nu
       })
     : "";
 
+  const tournamentTarget = 21;
+  const matchesRemaining = Math.max(0, tournamentTarget - totalTournamentMatches);
+
   return {
     team1: {
       id: team1Info.id,
@@ -885,10 +888,12 @@ export const getScoreboardData = cache(async (): Promise<TeamScoreboardData | nu
     },
     tonightMatchCount: latestSession.matches.length,
     totalTournamentMatches,
+    matchesRemaining,
     totalSessionsPlayed: publishedSessions.length,
     latestSessionDateStr: latestDateStr,
   };
 });
+
 
 
 
