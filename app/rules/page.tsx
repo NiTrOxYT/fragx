@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function RulesPage() {
   return (
-    <main className="min-h-screen bg-background text-on-background pt-20 pb-24 md:pb-16 px-safe-margin">
+    <main className="min-h-screen bg-background text-on-background pt-header-safe md:pt-24 pb-24 md:pb-16 px-safe-margin">
       <div className="max-w-5xl mx-auto flex flex-col gap-8 md:gap-12">
         {/* HERO SECTION */}
         <section className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-b from-[#18120c] via-[#0f0d0a] to-[#0a0a0a] p-6 sm:p-10 md:p-14 text-center shadow-[0_0_50px_rgba(255,77,0,0.08)]">
