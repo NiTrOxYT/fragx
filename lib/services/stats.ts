@@ -726,4 +726,169 @@ export const getLeaderboard = cache(
   }
 );
 
+export interface TeamScoreboardData {
+
+  team1: {
+    id: string;
+    name: string;
+    initial: string;
+    sessionWins: number;
+    tonightMatchesWon: number;
+    totalKills: number;
+  };
+  team2: {
+    id: string;
+    name: string;
+    initial: string;
+    sessionWins: number;
+    tonightMatchesWon: number;
+    totalKills: number;
+  };
+  tonightMatchCount: number;
+  totalTournamentMatches: number;
+  totalSessionsPlayed: number;
+  latestSessionDateStr: string;
+}
+
+export const getScoreboardData = cache(async (): Promise<TeamScoreboardData | null> => {
+  // Fetch active teams
+  const activeTeams = await (prisma.team as any).findMany({
+    where: { isActive: true },
+    orderBy: { name: "asc" },
+    take: 2,
+    select: { id: true, name: true },
+  });
+
+  if (activeTeams.length < 2) {
+    const allTeams = await (prisma.team as any).findMany({
+      orderBy: { name: "asc" },
+      take: 2,
+      select: { id: true, name: true },
+    });
+
+    if (allTeams.length < 2) {
+      return null;
+    }
+    activeTeams.push(...allTeams.slice(activeTeams.length));
+  }
+
+  const team1Info = activeTeams[0];
+  const team2Info = activeTeams[1];
+
+  const publishedSessions = await (prisma.gamingSession as any).findMany({
+    where: {
+      status: "PUBLISHED",
+      matches: {
+        some: {},
+      },
+    },
+    orderBy: [
+      { date: "desc" },
+      { publishedAt: "desc" },
+    ],
+    select: {
+      id: true,
+      date: true,
+      matches: {
+        select: {
+          id: true,
+          matchTeams: {
+            select: {
+              teamId: true,
+              placement: true,
+              players: {
+                select: { kills: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (publishedSessions.length === 0) {
+    return null;
+  }
+
+  const latestSession = publishedSessions[0];
+
+  let team1SessionWins = 0;
+  let team2SessionWins = 0;
+
+  let team1TonightMatchWins = 0;
+  let team2TonightMatchWins = 0;
+
+  let team1TotalKills = 0;
+  let team2TotalKills = 0;
+
+  let totalTournamentMatches = 0;
+
+  for (const session of publishedSessions) {
+    let sessionTeam1Wins = 0;
+    let sessionTeam2Wins = 0;
+
+    for (const match of session.matches) {
+      totalTournamentMatches += 1;
+
+      for (const mt of match.matchTeams || []) {
+        const killsInMatch = (mt.players || []).reduce(
+          (acc: number, p: any) => acc + (p.kills || 0),
+          0
+        );
+
+        if (mt.teamId === team1Info.id) {
+          team1TotalKills += killsInMatch;
+          if (mt.placement === 1) sessionTeam1Wins += 1;
+        } else if (mt.teamId === team2Info.id) {
+          team2TotalKills += killsInMatch;
+          if (mt.placement === 1) sessionTeam2Wins += 1;
+        }
+      }
+    }
+
+    if (session.id === latestSession.id) {
+      team1TonightMatchWins = sessionTeam1Wins;
+      team2TonightMatchWins = sessionTeam2Wins;
+    }
+
+    if (sessionTeam1Wins > sessionTeam2Wins) {
+      team1SessionWins += 1;
+    } else if (sessionTeam2Wins > sessionTeam1Wins) {
+      team2SessionWins += 1;
+    }
+  }
+
+  const latestDateStr = latestSession.date
+    ? new Date(latestSession.date).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
+
+  return {
+    team1: {
+      id: team1Info.id,
+      name: team1Info.name,
+      initial: team1Info.name.charAt(0).toUpperCase(),
+      sessionWins: team1SessionWins,
+      tonightMatchesWon: team1TonightMatchWins,
+      totalKills: team1TotalKills,
+    },
+    team2: {
+      id: team2Info.id,
+      name: team2Info.name,
+      initial: team2Info.name.charAt(0).toUpperCase(),
+      sessionWins: team2SessionWins,
+      tonightMatchesWon: team2TonightMatchWins,
+      totalKills: team2TotalKills,
+    },
+    tonightMatchCount: latestSession.matches.length,
+    totalTournamentMatches,
+    totalSessionsPlayed: publishedSessions.length,
+    latestSessionDateStr: latestDateStr,
+  };
+});
+
+
 

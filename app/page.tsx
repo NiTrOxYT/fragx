@@ -1,13 +1,14 @@
 import Link from "next/link";
 import {
   getLatestPublishedSession,
-
   getMVP,
   getGoldenGunAward,
   getSessionSummary,
   getRecentMatches,
+  getScoreboardData,
 } from "@/lib/services/stats";
 import GoldenGunAward from "@/components/common/GoldenGunAward";
+import TeamScoreboard from "@/components/common/TeamScoreboard";
 import EmptyState from "@/components/common/EmptyState";
 
 export const revalidate = 60; // 60-second ISR for fast public page delivery
@@ -29,11 +30,12 @@ export default async function HomePage() {
     );
   }
 
-  const [mvpData, goldenGunData, summary, recentMatches] = await Promise.all([
+  const [mvpData, goldenGunData, summary, recentMatches, scoreboardData] = await Promise.all([
     getMVP(latestSession.id),
     getGoldenGunAward(latestSession.id),
     getSessionSummary(latestSession.id),
     getRecentMatches(latestSession.id, 5),
+    getScoreboardData(),
   ]);
 
 
@@ -41,6 +43,8 @@ export default async function HomePage() {
 
   return (
     <main className="pt-header-safe md:pt-24 px-safe-margin max-w-7xl mx-auto space-y-stack-lg flex flex-col items-center w-full pb-[100px] md:pb-12">
+      {/* Team Scoreboard Banner */}
+      {scoreboardData && <TeamScoreboard data={scoreboardData} />}
 
       {/* Hero Section: MVP */}
       {mainMvp ? (
@@ -115,7 +119,7 @@ export default async function HomePage() {
         <h3 className="font-label-caps text-label-caps text-on-surface-variant tracking-widest pl-2 border-l-2 border-primary/50">
           SESSION SUMMARY
         </h3>
-        <div className="grid grid-cols-3 gap-3 md:gap-6">
+        <div className="grid grid-cols-2 gap-3 md:gap-6">
           {/* Stat Card 1 */}
           <div className="glass-panel p-stack-md rounded-lg flex flex-col items-center justify-center hover:border-primary/50 transition-colors duration-300">
             <span
@@ -148,20 +152,8 @@ export default async function HomePage() {
               TOTAL KILLS
             </span>
           </div>
-
-          {/* Stat Card 3 */}
-          <div className="glass-panel p-stack-md rounded-lg flex flex-col items-center justify-center hover:border-primary/50 transition-colors duration-300">
-            <span className="material-symbols-outlined text-primary/70 mb-2 text-2xl">
-              monitoring
-            </span>
-            <span className="font-headline text-headline-md text-on-surface">
-              {summary.winRate}%
-            </span>
-            <span className="font-label-caps text-label-caps text-on-surface-variant mt-1">
-              WIN RATE
-            </span>
-          </div>
         </div>
+
       </section>
 
       {/* Recent Matches List */}
