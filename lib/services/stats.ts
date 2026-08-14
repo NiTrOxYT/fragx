@@ -747,6 +747,7 @@ export interface TeamScoreboardData {
   };
   tonightMatchCount: number;
   totalTournamentMatches: number;
+  seriesRemaining: number;
   matchesRemaining: number;
   totalSessionsPlayed: number;
   latestSessionDateStr: string;
@@ -868,8 +869,8 @@ export const getScoreboardData = cache(async (): Promise<TeamScoreboardData | nu
       })
     : "";
 
-  const tournamentTarget = 21;
-  const matchesRemaining = Math.max(0, tournamentTarget - totalTournamentMatches);
+  const totalNightsInSeries = 21;
+  const seriesRemaining = Math.max(0, totalNightsInSeries - publishedSessions.length);
 
   return {
     team1: {
@@ -892,11 +893,13 @@ export const getScoreboardData = cache(async (): Promise<TeamScoreboardData | nu
     },
     tonightMatchCount: latestSession.matches.length,
     totalTournamentMatches,
-    matchesRemaining,
+    seriesRemaining,
+    matchesRemaining: seriesRemaining,
     totalSessionsPlayed: publishedSessions.length,
     latestSessionDateStr: latestDateStr,
   };
 });
+
 
 
 

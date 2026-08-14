@@ -307,60 +307,44 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
             </div>
 
             {/* ========================================================== */}
-            {/* 4. TOURNAMENT STATS BENTO (Doppelrand Triple Module) */}
+            {/* 4. TOURNAMENT STATS BENTO (Doppelrand Dual Module) */}
             {/* ========================================================== */}
-            <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+            <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
               
               {/* Module 1: Total Rounds */}
               <div className="rounded-2xl p-1 bg-white/[0.06] ring-1 ring-white/10 shadow-lg">
-                <div className="rounded-[calc(1rem-0.125rem)] bg-[#070910] p-4 sm:p-5 flex items-center justify-between">
+                <div className="rounded-[calc(1rem-0.125rem)] bg-[#070910] p-4 sm:p-6 flex items-center justify-between">
                   <div className="flex flex-col">
-                    <span className={`text-[10px] sm:text-[11px] font-bold tracking-[0.15em] text-cyan-400 uppercase ${jetbrainsMono.className}`}>
+                    <span className={`text-[10px] sm:text-xs font-bold tracking-[0.15em] text-cyan-400 uppercase ${jetbrainsMono.className}`}>
                       TOTAL ROUNDS
                     </span>
-                    <span className={`text-3xl sm:text-4xl font-extrabold text-white mt-1 ${anton.className}`}>
+                    <span className={`text-3xl sm:text-5xl font-extrabold text-white mt-1 ${anton.className}`}>
                       {totalTournamentMatches}
                     </span>
-                    <span className="text-[11px] text-white/50 mt-0.5">Published Tournament Matches</span>
+                    <span className="text-[11px] sm:text-xs text-white/50 mt-1">Published Tournament Matches</span>
                   </div>
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                    <span className="material-symbols-outlined text-xl sm:text-2xl">sports_esports</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Module 2: Tonight's Matches */}
-              <div className="rounded-2xl p-1 bg-white/[0.06] ring-1 ring-white/10 shadow-lg">
-                <div className="rounded-[calc(1rem-0.125rem)] bg-[#070910] p-4 sm:p-5 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className={`text-[10px] sm:text-[11px] font-bold tracking-[0.15em] text-amber-400 uppercase ${jetbrainsMono.className}`}>
-                      TONIGHT'S BATTLES
-                    </span>
-                    <span className={`text-3xl sm:text-4xl font-extrabold text-amber-300 mt-1 ${anton.className}`}>
-                      {tonightMatchCount}
-                    </span>
-                    <span className="text-[11px] text-white/50 mt-0.5">{latestSessionDateStr}</span>
-                  </div>
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]">
-                    <span className="material-symbols-outlined text-xl sm:text-2xl">calendar_today</span>
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+                    <span className="material-symbols-outlined text-2xl sm:text-3xl">sports_esports</span>
                   </div>
                 </div>
               </div>
 
-              {/* Module 3: Series Remaining */}
+              {/* Module 2: Series Remaining */}
               <div className="rounded-2xl p-1 bg-white/[0.06] ring-1 ring-white/10 shadow-lg">
-                <div className="rounded-[calc(1rem-0.125rem)] bg-[#070910] p-4 sm:p-5 flex items-center justify-between">
+                <div className="rounded-[calc(1rem-0.125rem)] bg-[#070910] p-4 sm:p-6 flex items-center justify-between">
                   <div className="flex flex-col">
-                    <span className={`text-[10px] sm:text-[11px] font-bold tracking-[0.15em] text-amber-400 uppercase ${jetbrainsMono.className}`}>
+                    <span className={`text-[10px] sm:text-xs font-bold tracking-[0.15em] text-amber-400 uppercase ${jetbrainsMono.className}`}>
                       SERIES REMAINING
                     </span>
-                    <span className={`text-3xl sm:text-4xl font-extrabold text-amber-300 mt-1 ${anton.className}`}>
-                      {matchesRemaining}
+                    <span className={`text-3xl sm:text-5xl font-extrabold text-amber-300 mt-1 ${anton.className}`}>
+                      {data.seriesRemaining ?? matchesRemaining}
                     </span>
-                    <span className="text-[11px] text-white/50 mt-0.5">Rounds To Championship</span>
+                    <span className="text-[11px] sm:text-xs text-white/50 mt-1">
+                      Nights To Championship • {totalSessionsPlayed}/21 Completed
+                    </span>
                   </div>
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]">
-                    <span className="material-symbols-outlined text-xl sm:text-2xl">monitoring</span>
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+                    <span className="material-symbols-outlined text-2xl sm:text-3xl">monitoring</span>
                   </div>
                 </div>
               </div>
