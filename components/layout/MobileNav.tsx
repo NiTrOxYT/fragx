@@ -20,6 +20,7 @@ export default function MobileNav() {
     { label: "Scoreboard", href: "/scoreboard", icon: "military_tech" },
     { label: "Matches", href: "/matches", icon: "sports_esports" },
     { label: "Leaderboard", href: "/leaderboard", icon: "leaderboard" },
+    { label: "Rules", href: "/rules", icon: "gavel" },
   ];
 
 

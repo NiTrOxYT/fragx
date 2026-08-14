@@ -11,6 +11,7 @@ export default function TopHeader() {
   const isMatchDetails = pathname.startsWith("/matches/") && pathname !== "/matches";
   const isAdminNew = pathname === "/admin/matches/new";
   const isReview = pathname.includes("/review");
+  const isRules = pathname.startsWith("/rules");
 
   const showBackButton = !isHome;
 
@@ -21,6 +22,8 @@ export default function TopHeader() {
     titleText = "ADD MATCH";
   } else if (isReview) {
     titleText = "REVIEW SESSION";
+  } else if (isRules) {
+    titleText = "RULES";
   }
 
   return (
@@ -81,6 +84,14 @@ export default function TopHeader() {
             Leaderboard
           </Link>
           <Link
+            href="/rules"
+            className={`font-label-caps text-label-caps tracking-widest uppercase transition-colors h-full flex items-center border-b-2 ${
+              pathname.startsWith("/rules") ? "text-primary border-primary" : "text-on-surface-variant hover:text-primary/80 border-transparent"
+            }`}
+          >
+            Rules
+          </Link>
+          <Link
             href="/admin"
             className={`font-label-caps text-label-caps tracking-widest uppercase transition-colors h-full flex items-center border-b-2 ${
               pathname.startsWith("/admin") ? "text-primary border-primary" : "text-on-surface-variant hover:text-primary/80 border-transparent"
@@ -88,7 +99,6 @@ export default function TopHeader() {
           >
             Admin
           </Link>
-
         </nav>
 
         {/* Right side spacer or notification button */}
