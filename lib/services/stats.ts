@@ -20,6 +20,8 @@ export interface GoldenGunAwardResult {
     avatarUrl: string;
   }[];
   totalKills: number;
+  isManual?: boolean;
+  isTie?: boolean;
 }
 
 /**
@@ -30,15 +32,9 @@ export function extractMVPFromSession(session: any): MVPResult | null {
     return null;
   }
 
-  const playerStatsMap = new Map<
+  const playerKillsMap = new Map<
     string,
-    {
-      id: string;
-      name: string;
-      avatarUrl: string;
-      totalKills: number;
-      bestPlacement: number;
-    }
+    { id: string; name: string; avatarUrl: string; totalKills: number; bestPlacement: number }
   >();
 
   let maxSingleMatchKills = 0;
@@ -49,68 +45,73 @@ export function extractMVPFromSession(session: any): MVPResult | null {
         for (const mp of mt.players || []) {
           const pId = mp.player?.id || mp.playerId;
           if (!pId) continue;
-          const existing = playerStatsMap.get(pId) || {
+          const kills = mp.kills || 0;
+          if (kills > maxSingleMatchKills) {
+            maxSingleMatchKills = kills;
+          }
+          const existing = playerKillsMap.get(pId) || {
             id: pId,
             name: mp.player?.name || "Player",
             avatarUrl: mp.player?.avatarUrl || "",
             totalKills: 0,
             bestPlacement: 999,
           };
-
-          existing.totalKills += mp.kills || 0;
+          existing.totalKills += kills;
           if (mt.placement < existing.bestPlacement) {
             existing.bestPlacement = mt.placement;
           }
-
-          playerStatsMap.set(pId, existing);
-
-          if ((mp.kills || 0) > maxSingleMatchKills) {
-            maxSingleMatchKills = mp.kills;
-          }
+          playerKillsMap.set(pId, existing);
         }
       }
     } else if (match.playerId && match.player) {
       const pId = match.playerId;
-      const existing = playerStatsMap.get(pId) || {
+      const kills = match.kills || 0;
+      if (kills > maxSingleMatchKills) {
+        maxSingleMatchKills = kills;
+      }
+      const existing = playerKillsMap.get(pId) || {
         id: pId,
         name: match.player.name,
         avatarUrl: match.player.avatarUrl,
         totalKills: 0,
         bestPlacement: 999,
       };
-
-      existing.totalKills += match.kills || 0;
+      existing.totalKills += kills;
       if ((match.placement || 999) < existing.bestPlacement) {
-        existing.bestPlacement = match.placement;
+        existing.bestPlacement = match.placement || 999;
       }
-
-      playerStatsMap.set(pId, existing);
-
-      if ((match.kills || 0) > maxSingleMatchKills) {
-        maxSingleMatchKills = match.kills;
-      }
+      playerKillsMap.set(pId, existing);
     }
   }
 
-  const aggregated = Array.from(playerStatsMap.values());
-  if (aggregated.length === 0) return null;
+  const allPlayers = Array.from(playerKillsMap.values());
+  if (allPlayers.length === 0) {
+    return null;
+  }
 
-  aggregated.sort((a, b) => {
-    if (b.totalKills !== a.totalKills) {
-      return b.totalKills - a.totalKills;
+  let maxTotalKills = 0;
+  for (const p of allPlayers) {
+    if (p.totalKills > maxTotalKills) {
+      maxTotalKills = p.totalKills;
     }
-    return a.bestPlacement - b.bestPlacement;
-  });
+  }
 
-  const topPlayer = aggregated[0];
-  const mvps = aggregated.filter(
-    (p) =>
-      p.totalKills === topPlayer.totalKills &&
-      p.bestPlacement === topPlayer.bestPlacement
-  );
+  if (maxTotalKills === 0) {
+    return null;
+  }
+
+  const topKillers = allPlayers.filter((p) => p.totalKills === maxTotalKills);
+  let bestPlacement = 999;
+  for (const p of topKillers) {
+    if (p.bestPlacement < bestPlacement) {
+      bestPlacement = p.bestPlacement;
+    }
+  }
+
+  const mvpWinners = topKillers.filter((p) => p.bestPlacement === bestPlacement);
 
   return {
-    players: mvps.map((p) => ({
+    players: mvpWinners.map((p) => ({
       id: p.id,
       name: p.name,
       avatarUrl: p.avatarUrl,
@@ -125,7 +126,7 @@ export function extractMVPFromSession(session: any): MVPResult | null {
  * Pure in-memory calculation of Golden Gun from an already-loaded session object.
  */
 export function extractGoldenGunFromSession(session: any): GoldenGunAwardResult | null {
-  if (!session || !session.matches || session.matches.length === 0) {
+  if (!session) {
     return null;
   }
 
@@ -134,7 +135,7 @@ export function extractGoldenGunFromSession(session: any): GoldenGunAwardResult 
     { id: string; name: string; avatarUrl: string; totalKills: number }
   >();
 
-  for (const match of session.matches) {
+  for (const match of session.matches || []) {
     if (match.matchTeams && match.matchTeams.length > 0) {
       for (const mt of match.matchTeams) {
         for (const mp of mt.players || []) {
@@ -163,6 +164,24 @@ export function extractGoldenGunFromSession(session: any): GoldenGunAwardResult 
     }
   }
 
+  // 1. If explicit manual GoldenGunAward record exists in DB
+  if (session.goldenGunAward && session.goldenGunAward.player) {
+    const p = session.goldenGunAward.player;
+    const kills = playerKillsMap.get(session.goldenGunAward.playerId)?.totalKills || 0;
+    return {
+      winners: [
+        {
+          id: p.id,
+          name: p.name,
+          avatarUrl: p.avatarUrl || "",
+        },
+      ],
+      totalKills: kills,
+      isManual: true,
+      isTie: false,
+    };
+  }
+
   const allPlayers = Array.from(playerKillsMap.values());
   if (allPlayers.length === 0) {
     return { winners: [], totalKills: 0 };
@@ -180,6 +199,7 @@ export function extractGoldenGunFromSession(session: any): GoldenGunAwardResult 
   }
 
   const winners = allPlayers.filter((p) => p.totalKills === maxTotalKills);
+  const isTie = winners.length > 1;
 
   return {
     winners: winners.map((w) => ({
@@ -188,6 +208,8 @@ export function extractGoldenGunFromSession(session: any): GoldenGunAwardResult 
       avatarUrl: w.avatarUrl,
     })),
     totalKills: maxTotalKills,
+    isManual: false,
+    isTie,
   };
 }
 
@@ -247,6 +269,15 @@ const getLatestPublishedSessionInternal = async () => {
       id: true,
       date: true,
       status: true,
+      goldenGunAward: {
+        select: {
+          id: true,
+          playerId: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+        },
+      },
       matches: {
         select: {
           id: true,
@@ -297,6 +328,15 @@ const getLatestPublishedSessionInternal = async () => {
       id: true,
       date: true,
       status: true,
+      goldenGunAward: {
+        select: {
+          id: true,
+          playerId: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+        },
+      },
       matches: {
         select: {
           id: true,
@@ -352,6 +392,15 @@ export const getGoldenGunAward = cache(async (sessionId?: string): Promise<Golde
     where: { id: sessionId },
     select: {
       id: true,
+      goldenGunAward: {
+        select: {
+          id: true,
+          playerId: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+        },
+      },
       matches: {
         select: {
           id: true,

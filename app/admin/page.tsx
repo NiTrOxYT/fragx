@@ -4,12 +4,26 @@ import { getOrCreateActiveDraftSession } from "@/lib/services/sessions";
 import { getAllAdminMatches } from "@/lib/services/matches";
 import { getAllPlayers } from "@/lib/services/players";
 import { getAllTeams } from "@/lib/services/teams";
+import {
+  getSessionGoldenGunDetails,
+  getAdminGoldenGunSessions,
+} from "@/lib/services/goldengun";
 import AdminDashboardClient from "./AdminDashboardClient";
 
 export const revalidate = 0;
 
 export default async function AdminDashboardPage() {
-  const [isAuthenticated, activeDraft, summary, mvpData, allMatches, players, teams] = await Promise.all([
+  const [
+    isAuthenticated,
+    activeDraft,
+    summary,
+    mvpData,
+    allMatches,
+    players,
+    teams,
+    initialGoldenGun,
+    goldenGunSessions,
+  ] = await Promise.all([
     verifyAdminAuth(),
     getOrCreateActiveDraftSession(),
     getSessionSummary(),
@@ -17,6 +31,8 @@ export default async function AdminDashboardPage() {
     getAllAdminMatches(),
     getAllPlayers(),
     getAllTeams(),
+    getSessionGoldenGunDetails(),
+    getAdminGoldenGunSessions(),
   ]);
 
   const currentMvp = mvpData?.players[0];
@@ -42,8 +58,8 @@ export default async function AdminDashboardPage() {
         players: t.players || [],
         playerCount: t.players?.length || 0,
       }))}
-
-
+      initialGoldenGun={initialGoldenGun}
+      initialGoldenGunSessions={goldenGunSessions}
       stats={{
         totalMatches: summary.matchCount,
         totalKills: summary.totalKills,
@@ -54,3 +70,4 @@ export default async function AdminDashboardPage() {
     />
   );
 }
+

@@ -4,6 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
+import AdminGoldenGunSection, {
+  GoldenGunSessionItem,
+} from "@/components/admin/AdminGoldenGunSection";
+import type { SessionGoldenGunDetails } from "@/lib/services/goldengun";
 
 export interface AdminPlayer {
   id: string;
@@ -50,6 +54,8 @@ interface AdminDashboardClientProps {
   initialMatches?: AdminMatchItem[];
   initialPlayers: AdminPlayer[];
   initialTeams: AdminTeam[];
+  initialGoldenGun?: SessionGoldenGunDetails | null;
+  initialGoldenGunSessions?: GoldenGunSessionItem[];
   stats: {
     totalMatches: number;
     totalKills: number;
@@ -66,6 +72,8 @@ export default function AdminDashboardClient({
   initialMatches = [],
   initialPlayers,
   initialTeams,
+  initialGoldenGun = null,
+  initialGoldenGunSessions = [],
   stats,
 }: AdminDashboardClientProps) {
   const [pin, setPin] = useState("");
@@ -73,8 +81,9 @@ export default function AdminDashboardClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
-  // Management section active tab: "MATCHES" | "PLAYERS" | "TEAMS"
-  const [activeTab, setActiveTab] = useState<"MATCHES" | "PLAYERS" | "TEAMS">("MATCHES");
+  // Management section active tab: "MATCHES" | "PLAYERS" | "TEAMS" | "GOLDEN_GUN"
+  const [activeTab, setActiveTab] = useState<"MATCHES" | "PLAYERS" | "TEAMS" | "GOLDEN_GUN">("MATCHES");
+
 
   // Matches management state
   const [matches, setMatches] = useState<AdminMatchItem[]>(initialMatches);
@@ -954,8 +963,21 @@ export default function AdminDashboardClient({
             <span className="material-symbols-outlined text-[18px]">shield</span>
             TEAMS ({teams.length})
           </button>
+
+          <button
+            onClick={() => setActiveTab("GOLDEN_GUN")}
+            className={`flex-1 md:flex-none px-5 py-2.5 rounded-lg font-label-caps text-label-caps uppercase transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
+              activeTab === "GOLDEN_GUN"
+                ? "bg-[#D4AF37] text-black font-bold shadow-md shadow-[#D4AF37]/20"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">military_tech</span>
+            GOLDEN GUN
+          </button>
         </div>
       </section>
+
 
       {/* SECTION 1: MATCHES & SESSIONS MANAGEMENT */}
       {activeTab === "MATCHES" && (
@@ -1638,6 +1660,15 @@ export default function AdminDashboardClient({
           </div>
         </div>
       )}
+
+      {/* SECTION 4: GOLDEN GUN AWARD MANAGEMENT */}
+      {activeTab === "GOLDEN_GUN" && (
+        <AdminGoldenGunSection
+          initialDetails={initialGoldenGun || null}
+          initialSessions={initialGoldenGunSessions || []}
+        />
+      )}
+
 
       {/* Delete Match Modal Portal */}
       {deleteMatchModalContent && createPortal(deleteMatchModalContent, document.body)}
