@@ -872,12 +872,22 @@ export default function AdminDashboardClient({
                     {/* Actions */}
                     <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-surface-container-high">
                       <Link
+                        href={`/admin/matches/${m.id}/edit`}
+                        className="px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-high border border-primary/40 text-primary font-label-caps text-xs flex items-center gap-1 transition-colors font-bold"
+                        title="Edit Match"
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                        EDIT
+                      </Link>
+
+                      <Link
                         href={`/matches/${m.id}`}
                         className="px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-high border border-surface-container-high text-on-surface font-label-caps text-xs flex items-center gap-1 transition-colors"
                       >
                         <span className="material-symbols-outlined text-sm">visibility</span>
                         VIEW
                       </Link>
+
 
                       {/* DELETE MATCH Button */}
                       <button

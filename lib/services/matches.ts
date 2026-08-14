@@ -314,11 +314,103 @@ export async function getAllAdminMatches(): Promise<AdminMatchItem[]> {
   });
 }
 
+export interface UpdateMultiTeamMatchInput {
+  sessionDate: string; // YYYY-MM-DD
+  matchNumber: number;
+  screenshotUrl: string;
+  duration?: string;
+  teams: {
+    teamId: string;
+    placement: number;
+    players: {
+      playerId: string;
+      kills: number;
+    }[];
+  }[];
+}
+
+export async function updateMultiTeamMatch(id: string, input: UpdateMultiTeamMatchInput) {
+  const { sessionDate, matchNumber, screenshotUrl, duration, teams } = input;
+
+  // 1. Get or create session for target sessionDate
+  const session = await getOrCreateSessionForDate(sessionDate);
+
+  // 2. Verify match exists
+  const existingMatch = await prisma.match.findUnique({
+    where: { id },
+    select: { id: true, sessionId: true, matchNumber: true },
+  });
+
+  if (!existingMatch) {
+    throw new Error("Match not found.");
+  }
+
+  // 3. Check for duplicate matchNumber in target session if date or matchNumber changed
+  if (existingMatch.sessionId !== session.id || existingMatch.matchNumber !== matchNumber) {
+    const duplicate = await prisma.match.findUnique({
+      where: {
+        sessionId_matchNumber: {
+          sessionId: session.id,
+          matchNumber,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (duplicate && duplicate.id !== id) {
+      throw new Error(
+        `Match #${matchNumber} already exists for session date ${formatSessionDate(
+          session.date
+        )}.`
+      );
+    }
+  }
+
+  // 4. Delete existing MatchPlayer & MatchTeam records for this match
+  await (prisma as any).matchPlayer.deleteMany({
+    where: {
+      matchTeam: {
+        matchId: id,
+      },
+    },
+  });
+
+  await (prisma as any).matchTeam.deleteMany({
+    where: { matchId: id },
+  });
+
+  // 5. Update Match and recreate MatchTeam + MatchPlayer in single atomic statement
+  return await (prisma.match as any).update({
+    where: { id },
+
+    data: {
+      sessionId: session.id,
+      matchNumber,
+      screenshotUrl,
+      duration: duration || "20:00 MIN",
+      matchTeams: {
+        create: teams.map((t) => ({
+          teamId: t.teamId,
+          placement: t.placement,
+          players: {
+            create: t.players.map((p) => ({
+              playerId: p.playerId,
+              kills: p.kills,
+            })),
+          },
+        })),
+      },
+    },
+    select: { id: true, matchNumber: true, sessionId: true },
+  });
+}
+
 export async function deleteMatch(id: string) {
   // Cascading deletes on MatchTeam & MatchPlayer handled by PostgreSQL onDelete: Cascade
   return await prisma.match.delete({
     where: { id },
   });
 }
+
 
 
