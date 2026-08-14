@@ -16,38 +16,42 @@ enum Role {
 }
 
 model Player {
-  id            String        @id @default(cuid())
-  name          String        @unique
-  avatarUrl     String
-  role          Role          @default(PLAYER)
-  accessKeyHash String?
-  isActive      Boolean       @default(true)
-  teamId        String?
-  team          Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  goldenGunAdjustment Int             @default(0)
+  id                  String           @id @default(cuid())
+  name                String           @unique
+  avatarUrl           String
+  role                Role             @default(PLAYER)
+  accessKeyHash       String?
+  isActive            Boolean          @default(true)
+  teamId              String?
+  team                Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  goldenGunAdjustment Int              @default(0)
   matches             Match[]
   matchPlayers        MatchPlayer[]
   goldenGunAwards     GoldenGunAward[]
 
   @@index([teamId])
+  @@index([isActive])
+  @@index([role])
+  @@index([isActive, name])
 }
 
 model GamingSession {
-  id              String           @id @default(cuid())
-  date            DateTime
-  status          String           @default("DRAFT") // DRAFT | PUBLISHED
-  publishedAt     DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  matches         Match[]
-  goldenGunAward  GoldenGunAward?
+  id             String          @id @default(cuid())
+  date           DateTime
+  status         String          @default("DRAFT") // DRAFT | PUBLISHED
+  publishedAt    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  matches        Match[]
+  goldenGunAward GoldenGunAward?
 
   @@index([status])
   @@index([date])
+  @@index([status, date(sort: Desc)])
+  @@index([status, publishedAt(sort: Desc)])
 }
-
 
 model Team {
   id        String      @id @default(cuid())
@@ -61,9 +65,8 @@ model Team {
 
   @@index([name])
   @@index([isActive])
+  @@index([isActive, name])
 }
-
-
 
 model Match {
   id            String        @id @default(cuid())
@@ -84,6 +87,7 @@ model Match {
   @@index([sessionId])
   @@index([playerId])
   @@index([matchNumber])
+  @@index([sessionId, matchNumber])
 }
 
 model MatchTeam {
@@ -116,6 +120,7 @@ model MatchPlayer {
   @@unique([matchTeamId, playerId])
   @@index([matchTeamId])
   @@index([playerId])
+  @@index([playerId, kills])
 }
 
 model GoldenGunAward {

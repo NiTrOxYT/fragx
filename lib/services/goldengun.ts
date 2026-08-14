@@ -28,140 +28,68 @@ export async function getSessionGoldenGunDetails(
 ): Promise<SessionGoldenGunDetails | null> {
   // 1. Resolve target session
   let session: any = null;
-
-  if (sessionId) {
-    session = await (prisma.gamingSession as any).findUnique({
-      where: { id: sessionId },
+  const sessionSelect = {
+    id: true,
+    date: true,
+    status: true,
+    goldenGunAward: {
       select: {
         id: true,
-        date: true,
-        status: true,
-        goldenGunAward: {
-          select: {
-            id: true,
-            playerId: true,
-            player: {
-              select: { id: true, name: true, avatarUrl: true },
-            },
-          },
+        playerId: true,
+        player: {
+          select: { id: true, name: true, avatarUrl: true },
         },
-        matches: {
+      },
+    },
+    matches: {
+      select: {
+        id: true,
+        matchNumber: true,
+        kills: true,
+        playerId: true,
+        player: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+        matchTeams: {
           select: {
-            id: true,
-            matchNumber: true,
-            kills: true,
-            playerId: true,
-            player: {
-              select: { id: true, name: true, avatarUrl: true },
-            },
-            matchTeams: {
+            players: {
               select: {
-                players: {
-                  select: {
-                    playerId: true,
-                    kills: true,
-                    player: {
-                      select: { id: true, name: true, avatarUrl: true },
-                    },
-                  },
+                playerId: true,
+                kills: true,
+                player: {
+                  select: { id: true, name: true, avatarUrl: true },
                 },
               },
             },
           },
         },
       },
+    },
+  };
+
+  if (sessionId) {
+    session = await (prisma.gamingSession as any).findUnique({
+      where: { id: sessionId },
+      select: sessionSelect,
     });
   } else {
     // Default to latest published session, or latest session overall
     session = await (prisma.gamingSession as any).findFirst({
       where: { status: "PUBLISHED" },
-      orderBy: { date: "desc" },
-      select: {
-        id: true,
-        date: true,
-        status: true,
-        goldenGunAward: {
-          select: {
-            id: true,
-            playerId: true,
-            player: {
-              select: { id: true, name: true, avatarUrl: true },
-            },
-          },
-        },
-        matches: {
-          select: {
-            id: true,
-            matchNumber: true,
-            kills: true,
-            playerId: true,
-            player: {
-              select: { id: true, name: true, avatarUrl: true },
-            },
-            matchTeams: {
-              select: {
-                players: {
-                  select: {
-                    playerId: true,
-                    kills: true,
-                    player: {
-                      select: { id: true, name: true, avatarUrl: true },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      select: sessionSelect,
     });
 
     if (!session) {
       session = await (prisma.gamingSession as any).findFirst({
-        orderBy: { date: "desc" },
-        select: {
-          id: true,
-          date: true,
-          status: true,
-          goldenGunAward: {
-            select: {
-              id: true,
-              playerId: true,
-              player: {
-                select: { id: true, name: true, avatarUrl: true },
-              },
-            },
-          },
-          matches: {
-            select: {
-              id: true,
-              matchNumber: true,
-              kills: true,
-              playerId: true,
-              player: {
-                select: { id: true, name: true, avatarUrl: true },
-              },
-              matchTeams: {
-                select: {
-                  players: {
-                    select: {
-                      playerId: true,
-                      kills: true,
-                      player: {
-                        select: { id: true, name: true, avatarUrl: true },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        select: sessionSelect,
       });
     }
   }
 
   if (!session) return null;
+
 
   // 2. Aggregate session total kills per participating player
   const playerMap = new Map<string, GoldenGunCandidate>();

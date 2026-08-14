@@ -333,7 +333,7 @@ export async function updatePlayerGoldenGunCount(playerId: string, targetCount: 
  * Returns players with cumulative kills, matches, and Golden Gun counts for Admin panel.
  */
 export async function getAdminPlayersList() {
-  const [players, goldenGunCounts, legacyMatches, multiTeamMatchPlayers] = await Promise.all([
+  const [players, goldenGunCounts, legacyGroups, multiTeamGroups] = await Promise.all([
     (prisma.player as any).findMany({
       select: {
         id: true,
@@ -346,13 +346,22 @@ export async function getAdminPlayersList() {
       orderBy: { name: "asc" },
     }),
     getGoldenGunCounts(),
-    (prisma.match as any).findMany({
-      where: { session: { status: "PUBLISHED" } },
-      select: { playerId: true, kills: true },
+    (prisma.match as any).groupBy({
+      by: ["playerId"],
+      where: {
+        session: { status: "PUBLISHED" },
+        playerId: { not: null },
+      },
+      _sum: { kills: true },
+      _count: { id: true },
     }),
-    (prisma as any).matchPlayer.findMany({
-      where: { matchTeam: { match: { session: { status: "PUBLISHED" } } } },
-      select: { playerId: true, kills: true },
+    (prisma as any).matchPlayer.groupBy({
+      by: ["playerId"],
+      where: {
+        matchTeam: { match: { session: { status: "PUBLISHED" } } },
+      },
+      _sum: { kills: true },
+      _count: { id: true },
     }),
   ]);
 
@@ -361,19 +370,19 @@ export async function getAdminPlayersList() {
     statsMap.set(p.id, { kills: 0, matches: 0 });
   }
 
-  for (const m of legacyMatches) {
-    if (m.playerId && statsMap.has(m.playerId)) {
-      const s = statsMap.get(m.playerId)!;
-      s.kills += m.kills || 0;
-      s.matches += 1;
+  for (const g of legacyGroups) {
+    if (g.playerId && statsMap.has(g.playerId)) {
+      const s = statsMap.get(g.playerId)!;
+      s.kills += g._sum?.kills || 0;
+      s.matches += g._count?.id || 0;
     }
   }
 
-  for (const mp of multiTeamMatchPlayers) {
-    if (mp.playerId && statsMap.has(mp.playerId)) {
-      const s = statsMap.get(mp.playerId)!;
-      s.kills += mp.kills || 0;
-      s.matches += 1;
+  for (const g of multiTeamGroups) {
+    if (g.playerId && statsMap.has(g.playerId)) {
+      const s = statsMap.get(g.playerId)!;
+      s.kills += g._sum?.kills || 0;
+      s.matches += g._count?.id || 0;
     }
   }
 
@@ -388,6 +397,7 @@ export async function getAdminPlayersList() {
     matchesCount: statsMap.get(p.id)?.matches || 0,
   }));
 }
+
 
 
 

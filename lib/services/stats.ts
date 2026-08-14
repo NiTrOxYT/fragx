@@ -575,6 +575,9 @@ const getGoldenGunCountsInternal = async (): Promise<{ [playerId: string]: numbe
     },
     select: {
       id: true,
+      goldenGunAward: {
+        select: { playerId: true },
+      },
       matches: {
         select: {
           id: true,
@@ -598,6 +601,13 @@ const getGoldenGunCountsInternal = async (): Promise<{ [playerId: string]: numbe
   const goldenGunCounts: { [playerId: string]: number } = {};
 
   for (const session of publishedSessions) {
+    // If an authoritative award is assigned for this session, use it directly
+    if (session.goldenGunAward?.playerId) {
+      const pId = session.goldenGunAward.playerId;
+      goldenGunCounts[pId] = (goldenGunCounts[pId] || 0) + 1;
+      continue;
+    }
+
     if (!session.matches || session.matches.length === 0) continue;
 
     const sessionPlayerKills: { [playerId: string]: number } = {};
@@ -653,7 +663,6 @@ export const getGoldenGunCounts = unstable_cache(
   { revalidate: 60, tags: ["stats", "matches", "sessions", "golden-gun", "players"] }
 );
 
-
 const getLeaderboardInternal = async (filter: "ALL TIME" | "THIS MONTH" | "THIS WEEK" = "ALL TIME") => {
   const now = new Date();
   let startDate: Date | undefined;
@@ -667,50 +676,50 @@ const getLeaderboardInternal = async (filter: "ALL TIME" | "THIS MONTH" | "THIS 
     startDate.setHours(0, 0, 0, 0);
   }
 
-  const matchesPromise = (prisma.match as any).findMany({
-    where: {
-      session: {
-        status: "PUBLISHED",
-        ...(startDate ? { date: { gte: startDate } } : {}),
-      },
-    },
-    select: {
-      id: true,
-      playerId: true,
-      kills: true,
-      placement: true,
-      player: {
-        select: { id: true, name: true, avatarUrl: true },
-      },
-      matchTeams: {
-        select: {
-          placement: true,
-          players: {
-            select: {
-              playerId: true,
-              kills: true,
-              player: {
-                select: { id: true, name: true, avatarUrl: true },
-              },
+  const [allPlayers, goldenGunCounts, multiTeamMatchPlayers, legacyMatches] = await Promise.all([
+    (prisma.player as any).findMany({
+      select: { id: true, name: true, avatarUrl: true },
+    }),
+    getGoldenGunCounts(),
+    (prisma as any).matchPlayer.findMany({
+      where: {
+        matchTeam: {
+          match: {
+            session: {
+              status: "PUBLISHED",
+              ...(startDate ? { date: { gte: startDate } } : {}),
             },
           },
         },
       },
-    },
-  });
-
-  const allPlayersPromise =
-    filter === "ALL TIME"
-      ? (prisma.player as any).findMany({
-          select: { id: true, name: true, avatarUrl: true },
-        })
-      : Promise.resolve([]);
-
-  const [matches, allPlayers, goldenGunCounts] = await Promise.all([
-    matchesPromise,
-    allPlayersPromise,
-    getGoldenGunCounts(),
+      select: {
+        playerId: true,
+        kills: true,
+        matchTeam: {
+          select: { placement: true },
+        },
+      },
+    }),
+    (prisma.match as any).findMany({
+      where: {
+        playerId: { not: null },
+        session: {
+          status: "PUBLISHED",
+          ...(startDate ? { date: { gte: startDate } } : {}),
+        },
+      },
+      select: {
+        playerId: true,
+        kills: true,
+        placement: true,
+      },
+    }),
   ]);
+
+  const playerDict = new Map<string, { id: string; name: string; avatarUrl: string }>();
+  for (const p of allPlayers) {
+    playerDict.set(p.id, p);
+  }
 
   const playerMap = new Map<
     string,
@@ -725,53 +734,57 @@ const getLeaderboardInternal = async (filter: "ALL TIME" | "THIS MONTH" | "THIS 
     }
   >();
 
-  for (const match of matches) {
-    if (match.matchTeams && match.matchTeams.length > 0) {
-      for (const mt of match.matchTeams) {
-        for (const mp of mt.players || []) {
-          const pId = mp.playerId;
-          if (!pId) continue;
-          const existing = playerMap.get(pId) || {
-            id: pId,
-            name: mp.player?.name || "Player",
-            avatarUrl: mp.player?.avatarUrl || "",
-            matchesCount: 0,
-            totalKills: 0,
-            wins: 0,
-            goldenGunCount: goldenGunCounts[pId] || 0,
-          };
+  // Process multi-team match players
+  for (const mp of multiTeamMatchPlayers) {
+    const pId = mp.playerId;
+    if (!pId) continue;
 
-          existing.matchesCount += 1;
-          existing.totalKills += mp.kills || 0;
-          if (mt.placement === 1) {
-            existing.wins += 1;
-          }
+    const pMeta = playerDict.get(pId);
+    const existing = playerMap.get(pId) || {
+      id: pId,
+      name: pMeta?.name || "Player",
+      avatarUrl: pMeta?.avatarUrl || "",
+      matchesCount: 0,
+      totalKills: 0,
+      wins: 0,
+      goldenGunCount: goldenGunCounts[pId] || 0,
+    };
 
-          playerMap.set(pId, existing);
-        }
-      }
-    } else if (match.playerId && match.player) {
-      const pId = match.playerId;
-      const existing = playerMap.get(pId) || {
-        id: pId,
-        name: match.player.name,
-        avatarUrl: match.player.avatarUrl,
-        matchesCount: 0,
-        totalKills: 0,
-        wins: 0,
-        goldenGunCount: goldenGunCounts[pId] || 0,
-      };
-
-      existing.matchesCount += 1;
-      existing.totalKills += match.kills || 0;
-      if (match.placement === 1) {
-        existing.wins += 1;
-      }
-
-      playerMap.set(pId, existing);
+    existing.matchesCount += 1;
+    existing.totalKills += mp.kills || 0;
+    if (mp.matchTeam?.placement === 1) {
+      existing.wins += 1;
     }
+
+    playerMap.set(pId, existing);
   }
 
+  // Process legacy single-player matches
+  for (const match of legacyMatches) {
+    const pId = match.playerId;
+    if (!pId) continue;
+
+    const pMeta = playerDict.get(pId);
+    const existing = playerMap.get(pId) || {
+      id: pId,
+      name: pMeta?.name || "Player",
+      avatarUrl: pMeta?.avatarUrl || "",
+      matchesCount: 0,
+      totalKills: 0,
+      wins: 0,
+      goldenGunCount: goldenGunCounts[pId] || 0,
+    };
+
+    existing.matchesCount += 1;
+    existing.totalKills += match.kills || 0;
+    if (match.placement === 1) {
+      existing.wins += 1;
+    }
+
+    playerMap.set(pId, existing);
+  }
+
+  // Ensure all registered players appear on the ALL TIME leaderboard
   if (filter === "ALL TIME") {
     for (const p of allPlayers) {
       if (!playerMap.has(p.id)) {
@@ -808,6 +821,7 @@ const getLeaderboardInternal = async (filter: "ALL TIME" | "THIS MONTH" | "THIS 
     ...item,
   }));
 };
+
 
 export const getLeaderboard = (filter: "ALL TIME" | "THIS MONTH" | "THIS WEEK" = "ALL TIME") => {
   return unstable_cache(
