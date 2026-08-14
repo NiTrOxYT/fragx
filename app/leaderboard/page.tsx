@@ -15,23 +15,27 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
   const leaderboard = await getLeaderboard(timeframe);
 
   return (
-    <main className="flex-1 w-full max-w-md mx-auto px-safe-margin flex flex-col gap-stack-lg pt-header-safe md:pt-20 pb-24">
-
+    <main className="flex-1 w-full max-w-4xl mx-auto px-safe-margin flex flex-col gap-stack-lg pt-header-safe md:pt-20 pb-24">
       {/* Header Section */}
       <section className="flex flex-col gap-stack-sm">
-        <h2 className="font-headline text-headline-md text-on-surface uppercase">
-          SQUAD LEADERBOARD
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-headline text-headline-md text-on-surface uppercase">
+            CUMULATIVE LEADERBOARD
+          </h2>
+          <span className="font-label-caps text-xs text-on-surface-variant/80 uppercase">
+            ALL-TIME FRAG STATS
+          </span>
+        </div>
 
-        {/* Filters */}
-        <div className="flex bg-surface-container rounded-lg p-1 mt-2">
+        {/* Timeframe Filters */}
+        <div className="flex bg-surface-container rounded-lg p-1 mt-2 max-w-xs">
           {(["ALL TIME", "THIS MONTH", "THIS WEEK"] as const).map((tf) => (
             <Link
               key={tf}
               href={`/leaderboard?timeframe=${encodeURIComponent(tf)}`}
               className={`flex-1 py-1.5 px-3 rounded text-center font-label-caps text-label-caps transition-all ${
                 timeframe === tf
-                  ? "bg-surface-variant text-on-surface shadow-sm"
+                  ? "bg-surface-variant text-on-surface shadow-sm font-bold"
                   : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
@@ -42,32 +46,44 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
       </section>
 
       {/* Leaderboard Table */}
-      {leaderboard.length > 0 ? (
-        <section className="glass-panel rounded-xl overflow-hidden flex flex-col">
+      {leaderboard && leaderboard.length > 0 ? (
+        <section className="glass-panel rounded-2xl overflow-hidden flex flex-col border border-surface-container-high shadow-xl">
           {/* Table Header */}
-          <div className="grid grid-cols-[30px_1fr_40px_50px] gap-gutter px-4 py-3 bg-surface-container-high border-b border-surface-variant">
-            <div className="font-label-caps text-label-caps text-on-surface-variant text-center">#</div>
-            <div className="font-label-caps text-label-caps text-on-surface-variant">PLAYER</div>
-            <div className="font-label-caps text-label-caps text-on-surface-variant text-right">M</div>
-            <div className="font-label-caps text-label-caps text-on-surface-variant text-right">K/D</div>
+          <div className="grid grid-cols-[40px_1fr_70px_90px_70px] gap-2 px-5 py-3.5 bg-surface-container-high border-b border-surface-container-high items-center">
+            <div className="font-label-caps text-xs text-on-surface-variant text-center font-bold">
+              #
+            </div>
+            <div className="font-label-caps text-xs text-on-surface-variant font-bold">
+              FRAGGER
+            </div>
+            <div className="font-label-caps text-xs text-on-surface-variant text-center font-bold">
+              MATCHES
+            </div>
+            <div className="font-label-caps text-xs text-primary text-right font-bold">
+              TOTAL KILLS
+            </div>
+            <div className="font-label-caps text-xs text-on-surface-variant text-right font-bold">
+              K/D
+            </div>
           </div>
 
           {/* List Container */}
-          <div className="flex flex-col overflow-y-auto max-h-[60vh]">
+          <div className="flex flex-col divide-y divide-surface-container-high/40">
             {leaderboard.map((item) => {
               let rankClass = "text-on-surface-variant";
               let sideBorderColor = "";
-              let avatarBorder = "border-surface-variant";
+              let avatarBorder = "border-surface-container-high";
 
               if (item.rank === 1) {
-                rankClass = "rank-gold";
-                sideBorderColor = "bg-[#D4AF37] opacity-80 shadow-[0_0_8px_rgba(212,175,55,0.6)]";
-                avatarBorder = "border-[#D4AF37]/30";
+                rankClass = "rank-gold text-gold font-bold text-lg";
+                sideBorderColor =
+                  "bg-[#D4AF37] opacity-80 shadow-[0_0_8px_rgba(212,175,55,0.6)]";
+                avatarBorder = "border-[#D4AF37]/60";
               } else if (item.rank === 2) {
-                rankClass = "rank-silver";
+                rankClass = "rank-silver text-gray-300 font-bold text-base";
                 sideBorderColor = "bg-[#C0C0C0] opacity-50";
               } else if (item.rank === 3) {
-                rankClass = "rank-bronze";
+                rankClass = "rank-bronze text-amber-600 font-bold text-base";
                 sideBorderColor = "bg-[#CD7F32] opacity-50";
               }
 
@@ -75,18 +91,22 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
                 <Link
                   key={item.id}
                   href={`/players/${item.id}`}
-                  className="grid grid-cols-[30px_1fr_40px_50px] gap-gutter items-center px-4 py-3.5 border-b border-surface-variant/50 hover:bg-surface-container-lowest transition-colors relative overflow-hidden group"
+                  className="grid grid-cols-[40px_1fr_70px_90px_70px] gap-2 items-center px-5 py-4 hover:bg-surface-container/60 transition-colors relative overflow-hidden group"
                 >
                   {sideBorderColor && (
                     <div className={`absolute inset-y-0 left-0 w-1 ${sideBorderColor}`} />
                   )}
 
-                  <div className={`font-stat-value text-stat-value text-center ${rankClass}`}>
-                    {item.rank}
+                  {/* Rank */}
+                  <div className={`font-display-stat text-center ${rankClass}`}>
+                    #{item.rank}
                   </div>
 
+                  {/* Player Info & Golden Gun Badge */}
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded bg-surface-container border ${avatarBorder} flex items-center justify-center overflow-hidden flex-shrink-0`}>
+                    <div
+                      className={`w-10 h-10 rounded-full bg-surface-container border-2 ${avatarBorder} flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm`}
+                    >
                       <img
                         src={item.avatarUrl}
                         alt={item.name}
@@ -94,22 +114,39 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
                       />
                     </div>
                     <div className="flex flex-col">
-                      <span className="font-body text-body-md text-on-surface font-semibold group-hover:text-primary transition-colors">
+                      <span className="font-headline text-headline-sm text-on-surface group-hover:text-primary transition-colors">
                         {item.name}
                       </span>
+
+                      {/* Golden Gun Indicator */}
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span
+                          className="material-symbols-outlined text-[15px] text-gold"
+                          style={{ fontVariationSettings: "'FILL' 1" }}
+                          title="Golden Gun Session Awards"
+                        >
+                          military_tech
+                        </span>
+                        <span className="font-label-caps text-[11px] text-gold font-bold">
+                          GOLDEN GUN × {item.goldenGunCount || 0}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="font-body text-body-md text-on-surface-variant text-right">
+                  {/* Matches Count */}
+                  <div className="font-mono text-sm text-on-surface-variant text-center">
                     {item.matchesCount}
                   </div>
 
-                  <div
-                    className={`font-stat-value text-stat-value text-right ${
-                      item.rank === 1 ? "text-primary" : "text-on-surface"
-                    }`}
-                  >
-                    {item.kd}
+                  {/* Total Kills */}
+                  <div className="font-display-stat text-lg text-primary text-right font-bold">
+                    {item.totalKills}
+                  </div>
+
+                  {/* K/D */}
+                  <div className="font-mono text-sm text-on-surface text-right font-bold">
+                    {item.kd.toFixed(2)}
                   </div>
                 </Link>
               );
@@ -126,4 +163,3 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
     </main>
   );
 }
-

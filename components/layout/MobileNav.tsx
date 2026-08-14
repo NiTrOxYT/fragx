@@ -19,8 +19,8 @@ export default function MobileNav() {
     { label: "Home", href: "/", icon: "home" },
     { label: "Matches", href: "/matches", icon: "sports_esports" },
     { label: "Leaderboard", href: "/leaderboard", icon: "leaderboard" },
-    { label: "Squad", href: "/players", icon: "group" },
   ];
+
 
   return (
     <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-safe-margin pb-safe bg-surface/80 backdrop-blur-md border-t border-outline-variant/20 shadow-[0_-4px_20px_rgba(255,181,158,0.05)] h-bottom-nav-height md:hidden">

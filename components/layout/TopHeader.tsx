@@ -72,14 +72,6 @@ export default function TopHeader() {
             Leaderboard
           </Link>
           <Link
-            href="/players"
-            className={`font-label-caps text-label-caps tracking-widest uppercase transition-colors h-full flex items-center border-b-2 ${
-              pathname.startsWith("/players") ? "text-primary border-primary" : "text-on-surface-variant hover:text-primary/80 border-transparent"
-            }`}
-          >
-            Squad
-          </Link>
-          <Link
             href="/admin"
             className={`font-label-caps text-label-caps tracking-widest uppercase transition-colors h-full flex items-center border-b-2 ${
               pathname.startsWith("/admin") ? "text-primary border-primary" : "text-on-surface-variant hover:text-primary/80 border-transparent"
@@ -87,6 +79,7 @@ export default function TopHeader() {
           >
             Admin
           </Link>
+
         </nav>
 
         {/* Right side spacer or notification button */}

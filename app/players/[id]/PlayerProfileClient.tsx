@@ -267,12 +267,27 @@ export default function PlayerProfileClient({
           <span className="font-display-stat text-display-stat text-on-background">{player.stats.kills}</span>
         </div>
 
+        {/* Golden Gun Count */}
+        <div className="glass-panel rounded-xl p-stack-md flex flex-col justify-between border-gold/30 bg-gradient-to-br from-[#171717] to-[#201c10] relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-3 opacity-20">
+            <span
+              className="material-symbols-outlined text-4xl text-gold"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              military_tech
+            </span>
+          </div>
+          <span className="font-label-caps text-label-caps text-on-surface-variant mb-2 relative z-10">GOLDEN GUN</span>
+          <span className="font-display-stat text-display-stat text-gold relative z-10">{(player.stats as any).goldenGunCount || 0}</span>
+        </div>
+
         {/* Avg Kills */}
         <div className="glass-panel rounded-xl p-stack-md flex flex-col justify-between">
           <span className="font-label-caps text-label-caps text-on-surface-variant mb-2">AVG KILLS</span>
           <span className="font-display-stat text-display-stat text-on-background">{player.stats.avgKills}</span>
         </div>
       </section>
+
 
       {/* Performance Chart */}
       <section className="glass-panel rounded-xl p-stack-md">

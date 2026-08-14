@@ -1,6 +1,8 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { cryptoNative } from "@/lib/auth-crypto";
+import { getGoldenGunCounts } from "@/lib/services/stats";
+
 
 export type PlayerRole = "PLAYER" | "MODERATOR" | "ADMIN";
 
@@ -128,6 +130,9 @@ export const getPlayerById = cache(async (id: string) => {
     }),
   }));
 
+  const goldenGunCounts = await getGoldenGunCounts();
+  const goldenGunCount = goldenGunCounts[id] || 0;
+
   return {
     ...player,
     stats: {
@@ -136,11 +141,13 @@ export const getPlayerById = cache(async (id: string) => {
       kills: totalKills,
       avgKills,
       kd,
+      goldenGunCount,
     },
     performance,
     recentMatches: combinedMatches.slice(0, 10),
   };
 });
+
 
 
 
