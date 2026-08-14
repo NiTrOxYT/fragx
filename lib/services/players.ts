@@ -1,8 +1,8 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 import { cryptoNative } from "@/lib/auth-crypto";
 import { getGoldenGunCounts } from "@/lib/services/stats";
-
 
 export type PlayerRole = "PLAYER" | "MODERATOR" | "ADMIN";
 
@@ -14,7 +14,7 @@ export interface PlayerRecord {
   isActive: boolean;
 }
 
-export const getAllPlayers = cache(async (): Promise<PlayerRecord[]> => {
+const getAllPlayersInternal = async (): Promise<PlayerRecord[]> => {
   return await (prisma.player as any).findMany({
     select: {
       id: true,
@@ -25,10 +25,15 @@ export const getAllPlayers = cache(async (): Promise<PlayerRecord[]> => {
     },
     orderBy: { name: "asc" },
   });
-});
+};
 
-export const getPlayerById = cache(async (id: string) => {
+export const getAllPlayers = unstable_cache(
+  getAllPlayersInternal,
+  ["all-players"],
+  { revalidate: 60, tags: ["players"] }
+);
 
+const getPlayerByIdInternal = async (id: string) => {
   const [player, legacyMatches, multiTeamMatchPlayers] = await Promise.all([
     (prisma.player as any).findUnique({
       where: { id },
@@ -60,7 +65,6 @@ export const getPlayerById = cache(async (id: string) => {
       orderBy: { createdAt: "desc" },
     }),
     (prisma as any).matchPlayer.findMany({
-
       where: {
         playerId: id,
         matchTeam: {
@@ -146,7 +150,16 @@ export const getPlayerById = cache(async (id: string) => {
     performance,
     recentMatches: combinedMatches.slice(0, 10),
   };
-});
+};
+
+export const getPlayerById = (id: string) => {
+  return unstable_cache(
+    async () => getPlayerByIdInternal(id),
+    [`player-${id}`],
+    { revalidate: 60, tags: ["players", `player-${id}`] }
+  )();
+};
+
 
 
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { verifyAdminAuth } from "@/lib/services/admin";
 import { publishSession } from "@/lib/services/sessions";
 
@@ -15,13 +15,20 @@ export async function POST(
   try {
     const session = await publishSession(params.id);
 
-    // Invalidate public page caches so changes appear instantly
+    // Invalidate public page caches and tags so changes appear instantly
     revalidatePath("/");
     revalidatePath("/matches");
     revalidatePath("/leaderboard");
     revalidatePath("/players");
+    revalidatePath("/scoreboard");
+    revalidateTag("stats");
+    revalidateTag("matches");
+    revalidateTag("sessions");
+    revalidateTag("scoreboard");
+    revalidateTag("leaderboard");
 
     return NextResponse.json({ session });
+
   } catch (error: any) {
     console.error("Publish session error:", error);
     return NextResponse.json(

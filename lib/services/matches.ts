@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 import { formatSessionDate } from "@/lib/utils/dates";
 import { getOrCreateSessionForDate } from "@/lib/services/sessions";
@@ -18,8 +19,7 @@ export interface CreateMultiTeamMatchInput {
   }[];
 }
 
-export const getMatchById = cache(async (id: string) => {
-
+const getMatchByIdInternal = async (id: string) => {
   const match = await (prisma.match as any).findUnique({
     where: { id },
     select: {
@@ -68,12 +68,18 @@ export const getMatchById = cache(async (id: string) => {
   });
 
   return match;
-});
+};
 
+export const getMatchById = (id: string) => {
+  return unstable_cache(
+    async () => getMatchByIdInternal(id),
+    [`match-${id}`],
+    { revalidate: 60, tags: ["matches", `match-${id}`] }
+  )();
+};
 
-export const getGroupedMatchHistory = cache(async () => {
+const getGroupedMatchHistoryInternal = async () => {
   const matches = await (prisma.match as any).findMany({
-
     where: {
       session: {
         status: "PUBLISHED",
@@ -141,7 +147,14 @@ export const getGroupedMatchHistory = cache(async () => {
   }));
 
   return result;
-});
+};
+
+export const getGroupedMatchHistory = unstable_cache(
+  getGroupedMatchHistoryInternal,
+  ["grouped-match-history"],
+  { revalidate: 60, tags: ["matches", "sessions"] }
+);
+
 
 
 /**

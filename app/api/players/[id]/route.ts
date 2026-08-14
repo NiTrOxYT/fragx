@@ -89,11 +89,17 @@ export async function PATCH(
 
     const updated = await updatePlayer(params.id, parsed);
 
+    const { revalidateTag } = await import("next/cache");
     revalidatePath(`/players/${params.id}`);
     revalidatePath("/players");
     revalidatePath("/leaderboard");
+    revalidatePath("/scoreboard");
     revalidatePath("/admin");
     revalidatePath("/");
+    revalidateTag("players");
+    revalidateTag("stats");
+    revalidateTag("leaderboard");
+    revalidateTag(`player-${params.id}`);
 
     return NextResponse.json({ player: updated });
   } catch (error: any) {
@@ -129,7 +135,6 @@ export async function DELETE(
     }
 
     if (!isAdmin && isModerator && (targetPlayer.role as string) === "ADMIN") {
-
       return NextResponse.json(
         { error: "Moderators cannot delete Administrators" },
         { status: 403 }
@@ -150,13 +155,19 @@ export async function DELETE(
 
     await deletePlayer(params.id);
 
+    const { revalidateTag } = await import("next/cache");
     revalidatePath(`/players/${params.id}`);
     revalidatePath("/players");
     revalidatePath("/leaderboard");
+    revalidatePath("/scoreboard");
     revalidatePath("/admin");
     revalidatePath("/");
+    revalidateTag("players");
+    revalidateTag("stats");
+    revalidateTag("leaderboard");
 
     return NextResponse.json({ success: true });
+
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || "Failed to delete player" },

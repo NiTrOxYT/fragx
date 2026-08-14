@@ -53,12 +53,20 @@ export async function PATCH(
 
     const updatedMatch = await updateMultiTeamMatch(params.id, parsed);
 
+    const { revalidateTag } = await import("next/cache");
     revalidatePath("/");
     revalidatePath("/matches");
     revalidatePath(`/matches/${params.id}`);
     revalidatePath("/leaderboard");
     revalidatePath("/players");
+    revalidatePath("/scoreboard");
     revalidatePath("/admin");
+    revalidateTag("matches");
+    revalidateTag("stats");
+    revalidateTag("sessions");
+    revalidateTag("scoreboard");
+    revalidateTag("leaderboard");
+    revalidateTag(`match-${params.id}`);
 
     return NextResponse.json({ match: updatedMatch });
   } catch (error: any) {
@@ -86,11 +94,18 @@ export async function DELETE(
   try {
     await deleteMatch(params.id);
 
+    const { revalidateTag } = await import("next/cache");
     revalidatePath("/");
     revalidatePath("/matches");
     revalidatePath("/leaderboard");
+    revalidatePath("/scoreboard");
     revalidatePath("/admin");
     revalidatePath("/players");
+    revalidateTag("matches");
+    revalidateTag("stats");
+    revalidateTag("sessions");
+    revalidateTag("scoreboard");
+    revalidateTag("leaderboard");
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -100,3 +115,4 @@ export async function DELETE(
     );
   }
 }
+

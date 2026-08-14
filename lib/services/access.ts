@@ -1,13 +1,39 @@
 import { cookies } from "next/headers";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 import { cryptoNative } from "@/lib/auth-crypto";
 
 const ACCESS_COOKIE_NAME = "fragx_access_session";
 
+const getCachedPlayerByToken = unstable_cache(
+  async (sessionToken: string) => {
+    try {
+      const player = await (prisma.player as any).findFirst({
+        where: {
+          accessKeyHash: sessionToken,
+          isActive: true,
+        },
+        select: { id: true, name: true, role: true, avatarUrl: true },
+      });
+      if (player) {
+        return {
+          ...player,
+          isAdmin: player.role === "ADMIN",
+        };
+      }
+    } catch (err) {
+      console.error("Error fetching authenticated player:", err);
+    }
+    return null;
+  },
+  ["auth-player-by-token"],
+  { revalidate: 300, tags: ["auth", "players"] }
+);
+
 /**
  * Retrieves the currently authenticated player/user from access session cookie.
- * Wrapped with React cache() to prevent redundant DB queries per request context.
+ * Wrapped with React cache() and Next.js unstable_cache for sub-millisecond response.
  */
 export const getAuthenticatedPlayer = cache(async (): Promise<{
   id: string;
@@ -28,26 +54,9 @@ export const getAuthenticatedPlayer = cache(async (): Promise<{
     return { id: "master", name: "ADMIN", role: "ADMIN", avatarUrl: "", isAdmin: true };
   }
 
-  try {
-    const player = await (prisma.player as any).findFirst({
-      where: {
-        accessKeyHash: sessionToken,
-        isActive: true,
-      },
-      select: { id: true, name: true, role: true, avatarUrl: true },
-    });
-    if (player) {
-      return {
-        ...player,
-        isAdmin: player.role === "ADMIN",
-      };
-    }
-  } catch (err) {
-    console.error("Error fetching authenticated player:", err);
-  }
-
-  return null;
+  return await getCachedPlayerByToken(sessionToken);
 });
+
 
 /**
  * Verifies whether the current request has a valid access token cookie.

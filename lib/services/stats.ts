@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 
 export interface MVPResult {
@@ -21,155 +22,113 @@ export interface GoldenGunAwardResult {
   totalKills: number;
 }
 
-export const getLatestPublishedSession = cache(async () => {
-  const sessionWithMatches = await (prisma.gamingSession as any).findFirst({
-    where: {
-      status: "PUBLISHED",
-      matches: {
-        some: {},
-      },
-    },
-
-    orderBy: [
-      { date: "desc" },
-      { publishedAt: "desc" },
-      { createdAt: "desc" },
-    ],
-
-    select: {
-      id: true,
-      date: true,
-      status: true,
-      matches: {
-        select: {
-          id: true,
-          matchNumber: true,
-          kills: true,
-          placement: true,
-          playerId: true,
-          player: {
-            select: { id: true, name: true, avatarUrl: true },
-          },
-          matchTeams: {
-            select: {
-              id: true,
-              placement: true,
-              team: {
-                select: { id: true, name: true },
-              },
-              players: {
-                select: {
-                  kills: true,
-                  player: {
-                    select: { id: true, name: true, avatarUrl: true },
-                  },
-                },
-              },
-            },
-          },
-        },
-        orderBy: { matchNumber: "asc" },
-      },
-    },
-  });
-
-  if (sessionWithMatches) {
-    return sessionWithMatches;
-  }
-
-  return await (prisma.gamingSession as any).findFirst({
-    where: { status: "PUBLISHED" },
-    orderBy: [
-      { date: "desc" },
-      { publishedAt: "desc" },
-      { createdAt: "desc" },
-    ],
-
-    select: {
-      id: true,
-      date: true,
-      status: true,
-      matches: {
-        select: {
-          id: true,
-          matchNumber: true,
-          kills: true,
-          placement: true,
-          playerId: true,
-          player: {
-            select: { id: true, name: true, avatarUrl: true },
-          },
-          matchTeams: {
-            select: {
-              id: true,
-              placement: true,
-              team: {
-                select: { id: true, name: true },
-              },
-              players: {
-                select: {
-                  kills: true,
-                  player: {
-                    select: { id: true, name: true, avatarUrl: true },
-                  },
-                },
-              },
-            },
-          },
-        },
-        orderBy: { matchNumber: "asc" },
-      },
-    },
-  });
-});
-
-
 /**
- * Calculates Golden Gun Award: Highest CUMULATIVE TOTAL KILLS across the ENTIRE Gaming Session.
- * Handles ties by returning all players who achieved that max total session kills.
+ * Pure in-memory calculation of MVP from an already-loaded session object.
  */
-export const getGoldenGunAward = cache(async (sessionId?: string): Promise<GoldenGunAwardResult | null> => {
-
-  let session;
-  if (sessionId) {
-    session = await (prisma.gamingSession as any).findUnique({
-      where: { id: sessionId },
-      select: {
-        id: true,
-        matches: {
-          select: {
-            id: true,
-            matchNumber: true,
-            kills: true,
-            playerId: true,
-            player: {
-              select: { id: true, name: true, avatarUrl: true },
-            },
-            matchTeams: {
-              select: {
-                players: {
-                  select: {
-                    kills: true,
-                    player: {
-                      select: { id: true, name: true, avatarUrl: true },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-  } else {
-    session = await getLatestPublishedSession();
-  }
-
-  if (!session || session.matches.length === 0) {
+export function extractMVPFromSession(session: any): MVPResult | null {
+  if (!session || !session.matches || session.matches.length === 0) {
     return null;
   }
 
-  // Aggregate total kills across all matches in the session per player
+  const playerStatsMap = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      avatarUrl: string;
+      totalKills: number;
+      bestPlacement: number;
+    }
+  >();
+
+  let maxSingleMatchKills = 0;
+
+  for (const match of session.matches) {
+    if (match.matchTeams && match.matchTeams.length > 0) {
+      for (const mt of match.matchTeams) {
+        for (const mp of mt.players || []) {
+          const pId = mp.player?.id || mp.playerId;
+          if (!pId) continue;
+          const existing = playerStatsMap.get(pId) || {
+            id: pId,
+            name: mp.player?.name || "Player",
+            avatarUrl: mp.player?.avatarUrl || "",
+            totalKills: 0,
+            bestPlacement: 999,
+          };
+
+          existing.totalKills += mp.kills || 0;
+          if (mt.placement < existing.bestPlacement) {
+            existing.bestPlacement = mt.placement;
+          }
+
+          playerStatsMap.set(pId, existing);
+
+          if ((mp.kills || 0) > maxSingleMatchKills) {
+            maxSingleMatchKills = mp.kills;
+          }
+        }
+      }
+    } else if (match.playerId && match.player) {
+      const pId = match.playerId;
+      const existing = playerStatsMap.get(pId) || {
+        id: pId,
+        name: match.player.name,
+        avatarUrl: match.player.avatarUrl,
+        totalKills: 0,
+        bestPlacement: 999,
+      };
+
+      existing.totalKills += match.kills || 0;
+      if ((match.placement || 999) < existing.bestPlacement) {
+        existing.bestPlacement = match.placement;
+      }
+
+      playerStatsMap.set(pId, existing);
+
+      if ((match.kills || 0) > maxSingleMatchKills) {
+        maxSingleMatchKills = match.kills;
+      }
+    }
+  }
+
+  const aggregated = Array.from(playerStatsMap.values());
+  if (aggregated.length === 0) return null;
+
+  aggregated.sort((a, b) => {
+    if (b.totalKills !== a.totalKills) {
+      return b.totalKills - a.totalKills;
+    }
+    return a.bestPlacement - b.bestPlacement;
+  });
+
+  const topPlayer = aggregated[0];
+  const mvps = aggregated.filter(
+    (p) =>
+      p.totalKills === topPlayer.totalKills &&
+      p.bestPlacement === topPlayer.bestPlacement
+  );
+
+  return {
+    players: mvps.map((p) => ({
+      id: p.id,
+      name: p.name,
+      avatarUrl: p.avatarUrl,
+      totalKills: p.totalKills,
+      bestPlacement: p.bestPlacement,
+    })),
+    peakKills: maxSingleMatchKills,
+  };
+}
+
+/**
+ * Pure in-memory calculation of Golden Gun from an already-loaded session object.
+ */
+export function extractGoldenGunFromSession(session: any): GoldenGunAwardResult | null {
+  if (!session || !session.matches || session.matches.length === 0) {
+    return null;
+  }
+
   const playerKillsMap = new Map<
     string,
     { id: string; name: string; avatarUrl: string; totalKills: number }
@@ -178,15 +137,16 @@ export const getGoldenGunAward = cache(async (sessionId?: string): Promise<Golde
   for (const match of session.matches) {
     if (match.matchTeams && match.matchTeams.length > 0) {
       for (const mt of match.matchTeams) {
-        for (const mp of mt.players) {
-          const pId = mp.player.id;
+        for (const mp of mt.players || []) {
+          const pId = mp.player?.id || mp.playerId;
+          if (!pId) continue;
           const existing = playerKillsMap.get(pId) || {
             id: pId,
-            name: mp.player.name,
-            avatarUrl: mp.player.avatarUrl,
+            name: mp.player?.name || "Player",
+            avatarUrl: mp.player?.avatarUrl || "",
             totalKills: 0,
           };
-          existing.totalKills += mp.kills;
+          existing.totalKills += mp.kills || 0;
           playerKillsMap.set(pId, existing);
         }
       }
@@ -229,179 +189,13 @@ export const getGoldenGunAward = cache(async (sessionId?: string): Promise<Golde
     })),
     totalKills: maxTotalKills,
   };
-});
+}
 
-
-export const getMVP = cache(async (sessionId?: string): Promise<MVPResult | null> => {
-
-  let session;
-  if (sessionId) {
-    session = await (prisma.gamingSession as any).findUnique({
-      where: { id: sessionId },
-      select: {
-        id: true,
-        matches: {
-          select: {
-            id: true,
-            kills: true,
-            placement: true,
-            playerId: true,
-            player: {
-              select: { id: true, name: true, avatarUrl: true },
-            },
-            matchTeams: {
-              select: {
-                id: true,
-                placement: true,
-                team: {
-                  select: { id: true, name: true },
-                },
-                players: {
-                  select: {
-                    kills: true,
-                    player: {
-                      select: { id: true, name: true, avatarUrl: true },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-  } else {
-    session = await getLatestPublishedSession();
-  }
-
-  if (!session || session.matches.length === 0) {
-    return null;
-  }
-
-  // Aggregate total session stats per player for MVP (total kills + placement tie-breaker)
-  const playerStatsMap = new Map<
-    string,
-    {
-      id: string;
-      name: string;
-      avatarUrl: string;
-      totalKills: number;
-      bestPlacement: number;
-    }
-  >();
-
-  let maxSingleMatchKills = 0;
-
-  for (const match of session.matches) {
-    if (match.matchTeams && match.matchTeams.length > 0) {
-      // Multi-team match structure
-      for (const mt of match.matchTeams) {
-        for (const mp of mt.players) {
-          const pId = mp.player.id;
-          const existing = playerStatsMap.get(pId) || {
-            id: pId,
-            name: mp.player.name,
-            avatarUrl: mp.player.avatarUrl,
-            totalKills: 0,
-            bestPlacement: 999,
-          };
-
-          existing.totalKills += mp.kills;
-          if (mt.placement < existing.bestPlacement) {
-            existing.bestPlacement = mt.placement;
-          }
-
-          playerStatsMap.set(pId, existing);
-
-          if (mp.kills > maxSingleMatchKills) {
-            maxSingleMatchKills = mp.kills;
-          }
-        }
-      }
-    } else if (match.playerId && match.player) {
-      // Legacy single-player match structure
-      const pId = match.playerId;
-      const existing = playerStatsMap.get(pId) || {
-        id: pId,
-        name: match.player.name,
-        avatarUrl: match.player.avatarUrl,
-        totalKills: 0,
-        bestPlacement: 999,
-      };
-
-      existing.totalKills += match.kills || 0;
-      if ((match.placement || 999) < existing.bestPlacement) {
-        existing.bestPlacement = match.placement;
-      }
-
-      playerStatsMap.set(pId, existing);
-
-      if ((match.kills || 0) > maxSingleMatchKills) {
-        maxSingleMatchKills = match.kills;
-      }
-    }
-  }
-
-  const aggregated = Array.from(playerStatsMap.values());
-  if (aggregated.length === 0) return null;
-
-  // Sort by totalKills desc, bestPlacement asc
-  aggregated.sort((a, b) => {
-    if (b.totalKills !== a.totalKills) {
-      return b.totalKills - a.totalKills;
-    }
-    return a.bestPlacement - b.bestPlacement;
-  });
-
-  const topPlayer = aggregated[0];
-  const mvps = aggregated.filter(
-    (p) =>
-      p.totalKills === topPlayer.totalKills &&
-      p.bestPlacement === topPlayer.bestPlacement
-  );
-
-  return {
-    players: mvps.map((p) => ({
-      id: p.id,
-      name: p.name,
-      avatarUrl: p.avatarUrl,
-      totalKills: p.totalKills,
-      bestPlacement: p.bestPlacement,
-    })),
-    peakKills: maxSingleMatchKills,
-  };
-});
-
-
-export const getSessionSummary = cache(async (sessionId?: string) => {
-
-  let session;
-  if (sessionId) {
-    session = await (prisma.gamingSession as any).findUnique({
-      where: { id: sessionId },
-      select: {
-        id: true,
-        matches: {
-          select: {
-            kills: true,
-            placement: true,
-            matchTeams: {
-              select: {
-                placement: true,
-                players: {
-                  select: { kills: true },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-  } else {
-    session = await getLatestPublishedSession();
-  }
-
-  if (!session || session.matches.length === 0) {
+/**
+ * Pure in-memory calculation of Session Summary from an already-loaded session object.
+ */
+export function extractSessionSummaryFromSession(session: any) {
+  if (!session || !session.matches || session.matches.length === 0) {
     return {
       matchCount: 0,
       totalKills: 0,
@@ -417,8 +211,8 @@ export const getSessionSummary = cache(async (sessionId?: string) => {
     if (match.matchTeams && match.matchTeams.length > 0) {
       for (const mt of match.matchTeams) {
         if (mt.placement === 1) wins += 1;
-        for (const mp of mt.players) {
-          totalKills += mp.kills;
+        for (const mp of mt.players || []) {
+          totalKills += mp.kills || 0;
         }
       }
     } else {
@@ -434,33 +228,257 @@ export const getSessionSummary = cache(async (sessionId?: string) => {
     totalKills,
     winRate,
   };
+}
+
+const getLatestPublishedSessionInternal = async () => {
+  const sessionWithMatches = await (prisma.gamingSession as any).findFirst({
+    where: {
+      status: "PUBLISHED",
+      matches: {
+        some: {},
+      },
+    },
+    orderBy: [
+      { date: "desc" },
+      { publishedAt: "desc" },
+      { createdAt: "desc" },
+    ],
+    select: {
+      id: true,
+      date: true,
+      status: true,
+      matches: {
+        select: {
+          id: true,
+          matchNumber: true,
+          kills: true,
+          placement: true,
+          screenshotUrl: true,
+          duration: true,
+          playerId: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+          matchTeams: {
+            select: {
+              id: true,
+              placement: true,
+              team: {
+                select: { id: true, name: true, avatarUrl: true },
+              },
+              players: {
+                select: {
+                  kills: true,
+                  player: {
+                    select: { id: true, name: true, avatarUrl: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { matchNumber: "asc" },
+      },
+    },
+  });
+
+  if (sessionWithMatches) {
+    return sessionWithMatches;
+  }
+
+  return await (prisma.gamingSession as any).findFirst({
+    where: { status: "PUBLISHED" },
+    orderBy: [
+      { date: "desc" },
+      { publishedAt: "desc" },
+      { createdAt: "desc" },
+    ],
+    select: {
+      id: true,
+      date: true,
+      status: true,
+      matches: {
+        select: {
+          id: true,
+          matchNumber: true,
+          kills: true,
+          placement: true,
+          screenshotUrl: true,
+          duration: true,
+          playerId: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+          matchTeams: {
+            select: {
+              id: true,
+              placement: true,
+              team: {
+                select: { id: true, name: true, avatarUrl: true },
+              },
+              players: {
+                select: {
+                  kills: true,
+                  player: {
+                    select: { id: true, name: true, avatarUrl: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { matchNumber: "asc" },
+      },
+    },
+  });
+};
+
+export const getLatestPublishedSession = unstable_cache(
+  getLatestPublishedSessionInternal,
+  ["latest-published-session"],
+  { revalidate: 60, tags: ["stats", "sessions", "matches"] }
+);
+
+/**
+ * Calculates Golden Gun Award: Highest CUMULATIVE TOTAL KILLS across the ENTIRE Gaming Session.
+ */
+export const getGoldenGunAward = cache(async (sessionId?: string): Promise<GoldenGunAwardResult | null> => {
+  const latestSession = await getLatestPublishedSession();
+  if (!sessionId || (latestSession && sessionId === latestSession.id)) {
+    return extractGoldenGunFromSession(latestSession);
+  }
+
+  const session = await (prisma.gamingSession as any).findUnique({
+    where: { id: sessionId },
+    select: {
+      id: true,
+      matches: {
+        select: {
+          id: true,
+          matchNumber: true,
+          kills: true,
+          playerId: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+          matchTeams: {
+            select: {
+              players: {
+                select: {
+                  kills: true,
+                  player: {
+                    select: { id: true, name: true, avatarUrl: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return extractGoldenGunFromSession(session);
 });
 
+export const getMVP = cache(async (sessionId?: string): Promise<MVPResult | null> => {
+  const latestSession = await getLatestPublishedSession();
+  if (!sessionId || (latestSession && sessionId === latestSession.id)) {
+    return extractMVPFromSession(latestSession);
+  }
+
+  const session = await (prisma.gamingSession as any).findUnique({
+    where: { id: sessionId },
+    select: {
+      id: true,
+      matches: {
+        select: {
+          id: true,
+          kills: true,
+          placement: true,
+          playerId: true,
+          player: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+          matchTeams: {
+            select: {
+              id: true,
+              placement: true,
+              team: {
+                select: { id: true, name: true },
+              },
+              players: {
+                select: {
+                  kills: true,
+                  player: {
+                    select: { id: true, name: true, avatarUrl: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return extractMVPFromSession(session);
+});
+
+export const getSessionSummary = cache(async (sessionId?: string) => {
+  const latestSession = await getLatestPublishedSession();
+  if (!sessionId || (latestSession && sessionId === latestSession.id)) {
+    return extractSessionSummaryFromSession(latestSession);
+  }
+
+  const session = await (prisma.gamingSession as any).findUnique({
+    where: { id: sessionId },
+    select: {
+      id: true,
+      matches: {
+        select: {
+          kills: true,
+          placement: true,
+          matchTeams: {
+            select: {
+              placement: true,
+              players: {
+                select: { kills: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return extractSessionSummaryFromSession(session);
+});
 
 export const getRecentMatches = cache(async (sessionId?: string, limit = 10) => {
-  let targetSessionId = sessionId;
-  if (!targetSessionId) {
-    const latest = await getLatestPublishedSession();
-    if (!latest) return [];
-    targetSessionId = latest.id;
+  const latestSession = await getLatestPublishedSession();
+  if (!sessionId || (latestSession && sessionId === latestSession.id)) {
+    if (!latestSession || !latestSession.matches) return [];
+    const reversed = [...latestSession.matches].reverse();
+    return reversed.slice(0, limit);
   }
 
   const matches = await (prisma.match as any).findMany({
     where: {
-      sessionId: targetSessionId,
+      sessionId,
       session: {
         status: "PUBLISHED",
       },
     },
     orderBy: [{ matchNumber: "desc" }, { createdAt: "desc" }],
     take: limit,
-
     select: {
       id: true,
       matchNumber: true,
       kills: true,
       placement: true,
       screenshotUrl: true,
+      duration: true,
       createdAt: true,
       player: {
         select: { id: true, name: true, avatarUrl: true },
@@ -473,7 +491,7 @@ export const getRecentMatches = cache(async (sessionId?: string, limit = 10) => 
           id: true,
           placement: true,
           team: {
-            select: { id: true, name: true },
+            select: { id: true, name: true, avatarUrl: true },
           },
           players: {
             select: {
@@ -494,10 +512,11 @@ export const getRecentMatches = cache(async (sessionId?: string, limit = 10) => 
 });
 
 
+
 /**
  * Calculates cumulative Golden Gun awards won count for each player across ALL published sessions.
  */
-export async function getGoldenGunCounts(): Promise<{ [playerId: string]: number }> {
+const getGoldenGunCountsInternal = async (): Promise<{ [playerId: string]: number }> => {
   const publishedSessions = await (prisma.gamingSession as any).findMany({
     where: {
       status: "PUBLISHED",
@@ -537,8 +556,8 @@ export async function getGoldenGunCounts(): Promise<{ [playerId: string]: number
     for (const match of session.matches) {
       if (match.matchTeams && match.matchTeams.length > 0) {
         for (const mt of match.matchTeams) {
-          for (const mp of mt.players) {
-            sessionPlayerKills[mp.playerId] = (sessionPlayerKills[mp.playerId] || 0) + mp.kills;
+          for (const mp of mt.players || []) {
+            sessionPlayerKills[mp.playerId] = (sessionPlayerKills[mp.playerId] || 0) + (mp.kills || 0);
           }
         }
       } else if (match.playerId) {
@@ -564,167 +583,176 @@ export async function getGoldenGunCounts(): Promise<{ [playerId: string]: number
   }
 
   return goldenGunCounts;
-}
+};
 
-export const getLeaderboard = cache(
-  async (filter: "ALL TIME" | "THIS MONTH" | "THIS WEEK" = "ALL TIME") => {
-    const now = new Date();
-    let startDate: Date | undefined;
+export const getGoldenGunCounts = unstable_cache(
+  getGoldenGunCountsInternal,
+  ["golden-gun-counts"],
+  { revalidate: 60, tags: ["stats", "matches", "sessions"] }
+);
 
-    if (filter === "THIS MONTH") {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else if (filter === "THIS WEEK") {
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-      startDate = new Date(now.setDate(diff));
-      startDate.setHours(0, 0, 0, 0);
-    }
+const getLeaderboardInternal = async (filter: "ALL TIME" | "THIS MONTH" | "THIS WEEK" = "ALL TIME") => {
+  const now = new Date();
+  let startDate: Date | undefined;
 
-    const matchesPromise = (prisma.match as any).findMany({
-      where: {
-        session: {
-          status: "PUBLISHED",
-          ...(startDate ? { date: { gte: startDate } } : {}),
-        },
+  if (filter === "THIS MONTH") {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (filter === "THIS WEEK") {
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    startDate = new Date(now.setDate(diff));
+    startDate.setHours(0, 0, 0, 0);
+  }
+
+  const matchesPromise = (prisma.match as any).findMany({
+    where: {
+      session: {
+        status: "PUBLISHED",
+        ...(startDate ? { date: { gte: startDate } } : {}),
       },
-      select: {
-        id: true,
-        playerId: true,
-        kills: true,
-        placement: true,
-        player: {
-          select: { id: true, name: true, avatarUrl: true },
-        },
-        matchTeams: {
-          select: {
-            placement: true,
-            players: {
-              select: {
-                playerId: true,
-                kills: true,
-                player: {
-                  select: { id: true, name: true, avatarUrl: true },
-                },
+    },
+    select: {
+      id: true,
+      playerId: true,
+      kills: true,
+      placement: true,
+      player: {
+        select: { id: true, name: true, avatarUrl: true },
+      },
+      matchTeams: {
+        select: {
+          placement: true,
+          players: {
+            select: {
+              playerId: true,
+              kills: true,
+              player: {
+                select: { id: true, name: true, avatarUrl: true },
               },
             },
           },
         },
       },
-    });
+    },
+  });
 
-    const allPlayersPromise =
-      filter === "ALL TIME"
-        ? (prisma.player as any).findMany({
-            select: { id: true, name: true, avatarUrl: true },
-          })
-        : Promise.resolve([]);
+  const allPlayersPromise =
+    filter === "ALL TIME"
+      ? (prisma.player as any).findMany({
+          select: { id: true, name: true, avatarUrl: true },
+        })
+      : Promise.resolve([]);
 
-    const [matches, allPlayers, goldenGunCounts] = await Promise.all([
-      matchesPromise,
-      allPlayersPromise,
-      getGoldenGunCounts(),
-    ]);
+  const [matches, allPlayers, goldenGunCounts] = await Promise.all([
+    matchesPromise,
+    allPlayersPromise,
+    getGoldenGunCounts(),
+  ]);
 
-    const playerMap = new Map<
-      string,
-      {
-        id: string;
-        name: string;
-        avatarUrl: string;
-        matchesCount: number;
-        totalKills: number;
-        wins: number;
-        goldenGunCount: number;
-      }
-    >();
-
-    for (const match of matches) {
-      if (match.matchTeams && match.matchTeams.length > 0) {
-        // Multi-team match
-        for (const mt of match.matchTeams) {
-          for (const mp of mt.players) {
-            const pId = mp.playerId;
-            const existing = playerMap.get(pId) || {
-              id: pId,
-              name: mp.player.name,
-              avatarUrl: mp.player.avatarUrl,
-              matchesCount: 0,
-              totalKills: 0,
-              wins: 0,
-              goldenGunCount: goldenGunCounts[pId] || 0,
-            };
-
-            existing.matchesCount += 1;
-            existing.totalKills += mp.kills;
-            if (mt.placement === 1) {
-              existing.wins += 1;
-            }
-
-            playerMap.set(pId, existing);
-          }
-        }
-      } else if (match.playerId && match.player) {
-        // Legacy single-player match
-        const pId = match.playerId;
-        const existing = playerMap.get(pId) || {
-          id: pId,
-          name: match.player.name,
-          avatarUrl: match.player.avatarUrl,
-          matchesCount: 0,
-          totalKills: 0,
-          wins: 0,
-          goldenGunCount: goldenGunCounts[pId] || 0,
-        };
-
-        existing.matchesCount += 1;
-        existing.totalKills += match.kills || 0;
-        if (match.placement === 1) {
-          existing.wins += 1;
-        }
-
-        playerMap.set(pId, existing);
-      }
+  const playerMap = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      avatarUrl: string;
+      matchesCount: number;
+      totalKills: number;
+      wins: number;
+      goldenGunCount: number;
     }
+  >();
 
-    // Include players with 0 matches if filter is ALL TIME
-    if (filter === "ALL TIME") {
-      for (const p of allPlayers) {
-        if (!playerMap.has(p.id)) {
-          playerMap.set(p.id, {
-            id: p.id,
-            name: p.name,
-            avatarUrl: p.avatarUrl,
+  for (const match of matches) {
+    if (match.matchTeams && match.matchTeams.length > 0) {
+      for (const mt of match.matchTeams) {
+        for (const mp of mt.players || []) {
+          const pId = mp.playerId;
+          if (!pId) continue;
+          const existing = playerMap.get(pId) || {
+            id: pId,
+            name: mp.player?.name || "Player",
+            avatarUrl: mp.player?.avatarUrl || "",
             matchesCount: 0,
             totalKills: 0,
             wins: 0,
-            goldenGunCount: goldenGunCounts[p.id] || 0,
-          });
+            goldenGunCount: goldenGunCounts[pId] || 0,
+          };
+
+          existing.matchesCount += 1;
+          existing.totalKills += mp.kills || 0;
+          if (mt.placement === 1) {
+            existing.wins += 1;
+          }
+
+          playerMap.set(pId, existing);
         }
       }
-    }
-
-    const leaderboard = Array.from(playerMap.values()).map((p) => {
-      const kd = p.matchesCount > 0 ? Number((p.totalKills / p.matchesCount).toFixed(2)) : 0;
-      return {
-        ...p,
-        kd,
-        goldenGunCount: goldenGunCounts[p.id] || 0,
+    } else if (match.playerId && match.player) {
+      const pId = match.playerId;
+      const existing = playerMap.get(pId) || {
+        id: pId,
+        name: match.player.name,
+        avatarUrl: match.player.avatarUrl,
+        matchesCount: 0,
+        totalKills: 0,
+        wins: 0,
+        goldenGunCount: goldenGunCounts[pId] || 0,
       };
-    });
 
-    // Primary ranking: TOTAL KILLS DESC, then K/D DESC, then matchesCount DESC
-    leaderboard.sort((a, b) => {
-      if (b.totalKills !== a.totalKills) return b.totalKills - a.totalKills;
-      if (b.kd !== a.kd) return b.kd - a.kd;
-      return b.matchesCount - a.matchesCount;
-    });
+      existing.matchesCount += 1;
+      existing.totalKills += match.kills || 0;
+      if (match.placement === 1) {
+        existing.wins += 1;
+      }
 
-    return leaderboard.map((item, index) => ({
-      rank: index + 1,
-      ...item,
-    }));
+      playerMap.set(pId, existing);
+    }
   }
-);
+
+  if (filter === "ALL TIME") {
+    for (const p of allPlayers) {
+      if (!playerMap.has(p.id)) {
+        playerMap.set(p.id, {
+          id: p.id,
+          name: p.name,
+          avatarUrl: p.avatarUrl,
+          matchesCount: 0,
+          totalKills: 0,
+          wins: 0,
+          goldenGunCount: goldenGunCounts[p.id] || 0,
+        });
+      }
+    }
+  }
+
+  const leaderboard = Array.from(playerMap.values()).map((p) => {
+    const kd = p.matchesCount > 0 ? Number((p.totalKills / p.matchesCount).toFixed(2)) : 0;
+    return {
+      ...p,
+      kd,
+      goldenGunCount: goldenGunCounts[p.id] || 0,
+    };
+  });
+
+  leaderboard.sort((a, b) => {
+    if (b.totalKills !== a.totalKills) return b.totalKills - a.totalKills;
+    if (b.kd !== a.kd) return b.kd - a.kd;
+    return b.matchesCount - a.matchesCount;
+  });
+
+  return leaderboard.map((item, index) => ({
+    rank: index + 1,
+    ...item,
+  }));
+};
+
+export const getLeaderboard = (filter: "ALL TIME" | "THIS MONTH" | "THIS WEEK" = "ALL TIME") => {
+  return unstable_cache(
+    async () => getLeaderboardInternal(filter),
+    [`leaderboard-${filter}`],
+    { revalidate: 60, tags: ["stats", "leaderboard", "matches", "players"] }
+  )();
+};
 
 export interface TeamScoreboardData {
   team1: {
@@ -753,7 +781,7 @@ export interface TeamScoreboardData {
   latestSessionDateStr: string;
 }
 
-export const getScoreboardData = cache(async (): Promise<TeamScoreboardData | null> => {
+const getScoreboardDataInternal = async (): Promise<TeamScoreboardData | null> => {
   // Fetch active teams
   const activeTeams = await (prisma.team as any).findMany({
     where: { isActive: true },
@@ -898,7 +926,14 @@ export const getScoreboardData = cache(async (): Promise<TeamScoreboardData | nu
     totalSessionsPlayed: publishedSessions.length,
     latestSessionDateStr: latestDateStr,
   };
-});
+};
+
+export const getScoreboardData = unstable_cache(
+  getScoreboardDataInternal,
+  ["scoreboard-data"],
+  { revalidate: 60, tags: ["stats", "scoreboard", "matches", "teams"] }
+);
+
 
 
 

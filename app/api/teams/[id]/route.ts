@@ -40,10 +40,14 @@ export async function PATCH(
       isActive: parsed.isActive,
     });
 
+    const { revalidateTag } = await import("next/cache");
     revalidatePath("/admin");
     revalidatePath("/scoreboard");
     revalidatePath("/matches");
     revalidatePath("/");
+    revalidateTag("teams");
+    revalidateTag("stats");
+    revalidateTag("scoreboard");
 
     return NextResponse.json({ team });
   } catch (error: any) {
@@ -66,10 +70,14 @@ export async function DELETE(
   try {
     await deleteTeam(params.id);
 
+    const { revalidateTag } = await import("next/cache");
     revalidatePath("/admin");
     revalidatePath("/scoreboard");
     revalidatePath("/matches");
     revalidatePath("/");
+    revalidateTag("teams");
+    revalidateTag("stats");
+    revalidateTag("scoreboard");
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

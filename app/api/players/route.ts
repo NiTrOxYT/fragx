@@ -25,6 +25,15 @@ export async function POST(request: Request) {
     const parsed = createPlayerSchema.parse(body);
 
     const player = await createPlayer(parsed.name, parsed.secretKey, parsed.role);
+
+    const { revalidateTag, revalidatePath } = await import("next/cache");
+    revalidatePath("/players");
+    revalidatePath("/leaderboard");
+    revalidatePath("/admin");
+    revalidateTag("players");
+    revalidateTag("stats");
+    revalidateTag("leaderboard");
+
     return NextResponse.json({ player }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json(

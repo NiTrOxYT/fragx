@@ -1,10 +1,32 @@
 import type { Metadata, Viewport } from "next";
+import { Sora, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import TopHeader from "@/components/layout/TopHeader";
 import MobileNav from "@/components/layout/MobileNav";
 import PwaRegister from "@/components/common/PwaRegister";
 import { verifyAccessAuth } from "@/lib/services/access";
 import AccessGateClient from "@/components/common/AccessGateClient";
+
+const hankenGrotesk = Hanken_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  display: "swap",
+  variable: "--font-hanken",
+});
+
+const sora = Sora({
+  subsets: ["latin"],
+  weight: ["400", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-sora",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  display: "swap",
+  variable: "--font-mono",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://fragx.app"),
@@ -62,8 +84,19 @@ export default async function RootLayout({
   const isAccessAuthorized = await verifyAccessAuth();
 
   return (
-    <html lang="en" className="dark">
-      <body className="bg-background text-on-background min-h-screen antialiased flex flex-col font-body selection:bg-primary-container selection:text-white">
+    <html
+      lang="en"
+      className={`dark ${hankenGrotesk.variable} ${sora.variable} ${jetbrainsMono.variable}`}
+    >
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        />
+      </head>
+      <body className={`bg-background text-on-background min-h-screen antialiased flex flex-col font-body selection:bg-primary-container selection:text-white ${hankenGrotesk.className}`}>
         <PwaRegister />
         {isAccessAuthorized ? (
           <>
@@ -78,3 +111,4 @@ export default async function RootLayout({
     </html>
   );
 }
+

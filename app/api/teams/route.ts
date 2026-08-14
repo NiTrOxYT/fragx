@@ -40,10 +40,14 @@ export async function POST(request: Request) {
       avatarUrl: parsed.avatarUrl || null,
     });
 
+    const { revalidateTag } = await import("next/cache");
     revalidatePath("/admin");
     revalidatePath("/scoreboard");
     revalidatePath("/matches");
     revalidatePath("/");
+    revalidateTag("teams");
+    revalidateTag("stats");
+    revalidateTag("scoreboard");
 
     return NextResponse.json({ team }, { status: 201 });
   } catch (error: any) {

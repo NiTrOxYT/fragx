@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 
 export interface TeamPlayerSummary {
@@ -30,7 +31,7 @@ function validateAvatarUrl(url?: string | null): string | null {
   return trimmed;
 }
 
-export const getAllTeams = cache(async (): Promise<TeamRecord[]> => {
+const getAllTeamsInternal = async (): Promise<TeamRecord[]> => {
   const teams = await (prisma.team as any).findMany({
     orderBy: { name: "asc" },
     select: {
@@ -70,9 +71,15 @@ export const getAllTeams = cache(async (): Promise<TeamRecord[]> => {
     playerCount: t.players?.length || 0,
     createdAt: t.createdAt,
   }));
-});
+};
 
-export const getActiveTeams = cache(async (): Promise<TeamRecord[]> => {
+export const getAllTeams = unstable_cache(
+  getAllTeamsInternal,
+  ["all-teams"],
+  { revalidate: 60, tags: ["teams"] }
+);
+
+const getActiveTeamsInternal = async (): Promise<TeamRecord[]> => {
   const teams = await (prisma.team as any).findMany({
     where: { isActive: true },
     orderBy: { name: "asc" },
@@ -114,7 +121,13 @@ export const getActiveTeams = cache(async (): Promise<TeamRecord[]> => {
     playerCount: t.players?.length || 0,
     createdAt: t.createdAt,
   }));
-});
+};
+
+export const getActiveTeams = unstable_cache(
+  getActiveTeamsInternal,
+  ["active-teams"],
+  { revalidate: 60, tags: ["teams"] }
+);
 
 export async function getTeamWithPlayers(teamId: string) {
   const team = await (prisma.team as any).findUnique({

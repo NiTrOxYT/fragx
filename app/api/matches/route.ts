@@ -57,33 +57,47 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Check if multi-team match format
-    if (body.teams && Array.isArray(body.teams)) {
+    const isMultiTeam = body.teams && Array.isArray(body.teams);
+    let match;
+
+    if (isMultiTeam) {
       const parsed = createMultiTeamMatchSchema.parse(body);
-      const match = await createMultiTeamMatch(parsed);
-      return NextResponse.json({ match }, { status: 201 });
+      match = await createMultiTeamMatch(parsed);
+    } else {
+      // Legacy single-player match format
+      const parsed = legacyMatchSchema.parse(body);
+      let targetSessionId = parsed.sessionId;
+      if (!targetSessionId && parsed.sessionDate) {
+        const session = await getOrCreateSessionForDate(parsed.sessionDate);
+        targetSessionId = session.id;
+      } else if (!targetSessionId) {
+        const session = await getOrCreateActiveDraftSession();
+        targetSessionId = session.id;
+      }
+
+      match = await createMatch({
+        sessionId: targetSessionId,
+        matchNumber: parsed.matchNumber,
+        playerId: parsed.playerId,
+        kills: parsed.kills,
+        placement: parsed.placement,
+        screenshotUrl: parsed.screenshotUrl,
+        duration: parsed.duration,
+      });
     }
 
-    // Legacy single-player match format
-    const parsed = legacyMatchSchema.parse(body);
-    let targetSessionId = parsed.sessionId;
-    if (!targetSessionId && parsed.sessionDate) {
-      const session = await getOrCreateSessionForDate(parsed.sessionDate);
-      targetSessionId = session.id;
-    } else if (!targetSessionId) {
-      const session = await getOrCreateActiveDraftSession();
-      targetSessionId = session.id;
-    }
+    const { revalidateTag, revalidatePath } = await import("next/cache");
+    revalidatePath("/");
+    revalidatePath("/matches");
+    revalidatePath("/leaderboard");
+    revalidatePath("/players");
+    revalidatePath("/scoreboard");
+    revalidateTag("matches");
+    revalidateTag("stats");
+    revalidateTag("sessions");
+    revalidateTag("scoreboard");
+    revalidateTag("leaderboard");
 
-    const match = await createMatch({
-      sessionId: targetSessionId,
-      matchNumber: parsed.matchNumber,
-      playerId: parsed.playerId,
-      kills: parsed.kills,
-      placement: parsed.placement,
-      screenshotUrl: parsed.screenshotUrl,
-      duration: parsed.duration,
-    });
     return NextResponse.json({ match }, { status: 201 });
   } catch (error: any) {
     console.error("Create match error:", error);
