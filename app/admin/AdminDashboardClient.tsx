@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 
 export interface AdminPlayer {
   id: string;
@@ -58,6 +59,17 @@ export default function AdminDashboardClient({
   const [newPlayerSecretKey, setNewPlayerSecretKey] = useState("");
   const [playerActionMsg, setPlayerActionMsg] = useState("");
   const [loadingPlayerId, setLoadingPlayerId] = useState<string | null>(null);
+
+  // Edit Player Modal state
+  const [editingPlayer, setEditingPlayer] = useState<AdminPlayer | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editAvatarUrl, setEditAvatarUrl] = useState("");
+  const [editRole, setEditRole] = useState<"PLAYER" | "MODERATOR" | "ADMIN">("PLAYER");
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [editSecretKey, setEditSecretKey] = useState("");
+  const [editImageError, setEditImageError] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editErrorMsg, setEditErrorMsg] = useState("");
 
   // Team management state
   const [teams, setTeams] = useState<AdminTeam[]>(initialTeams);
@@ -128,7 +140,62 @@ export default function AdminDashboardClient({
     }
   };
 
-  // Update player role or status
+  // Open Edit Player Modal
+  const handleOpenEditModal = (player: AdminPlayer) => {
+    setEditingPlayer(player);
+    setEditName(player.name);
+    setEditAvatarUrl(player.avatarUrl);
+    setEditRole(player.role);
+    setEditIsActive(player.isActive);
+    setEditSecretKey("");
+    setEditImageError(false);
+    setEditErrorMsg("");
+  };
+
+  // Save Edit Player
+  const handleSaveEditPlayer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlayer) return;
+
+    setEditErrorMsg("");
+    setEditSaving(true);
+
+    try {
+      const payload: any = {
+        name: editName.trim(),
+        avatarUrl: editAvatarUrl.trim() || undefined,
+        role: editRole,
+        isActive: editIsActive,
+      };
+
+      if (editSecretKey.trim()) {
+        payload.secretKey = editSecretKey.trim();
+      }
+
+      const res = await fetch(`/api/players/${editingPlayer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.player) {
+        setPlayers((prev) =>
+          prev.map((p) => (p.id === editingPlayer.id ? { ...p, ...data.player } : p))
+        );
+        setEditingPlayer(null);
+        setPlayerActionMsg(`Player ${data.player.name} updated successfully.`);
+      } else {
+        setEditErrorMsg(data.error || "Failed to update player.");
+      }
+    } catch (err: any) {
+      setEditErrorMsg(err?.message || "Error updating player.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // Quick inline update player role or status
   const handleUpdatePlayer = async (
     id: string,
     updates: { role?: "PLAYER" | "MODERATOR" | "ADMIN"; isActive?: boolean }
@@ -313,6 +380,167 @@ export default function AdminDashboardClient({
     );
   }
 
+  // Admin Edit Player Modal JSX
+  const editModalContent = editingPlayer && (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="w-full max-w-lg bg-[#171717]/95 border border-primary/40 rounded-2xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center border-b border-surface-container-high pb-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-xl">manage_accounts</span>
+            <h3 className="font-headline text-headline-sm text-on-surface uppercase">
+              EDIT PLAYER — {editingPlayer.name}
+            </h3>
+          </div>
+          <button
+            onClick={() => setEditingPlayer(null)}
+            className="text-on-surface-variant hover:text-on-surface p-1"
+          >
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+
+        {editErrorMsg && (
+          <div className="p-3 rounded-lg bg-error/10 border border-error/30 text-error font-label-caps text-xs flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">warning</span>
+            <span>{editErrorMsg}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveEditPlayer} className="space-y-4">
+          {/* Gamertag Input */}
+          <div className="space-y-1">
+            <label className="font-label-caps text-xs text-primary uppercase font-bold block">
+              GAMERTAG
+            </label>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              required
+              className="w-full bg-surface-container border border-surface-container-high rounded-xl px-4 py-3 font-headline text-on-surface focus:outline-none focus:border-primary"
+            />
+          </div>
+
+          {/* Profile Image URL Input */}
+          <div className="space-y-1">
+            <label className="font-label-caps text-xs text-primary uppercase font-bold block">
+              PROFILE IMAGE URL
+            </label>
+            <input
+              type="url"
+              value={editAvatarUrl}
+              onChange={(e) => {
+                setEditAvatarUrl(e.target.value);
+                setEditImageError(false);
+              }}
+              placeholder="https://example.com/avatar.jpg"
+              className="w-full bg-surface-container border border-surface-container-high rounded-xl px-4 py-3 font-body text-sm text-on-surface focus:outline-none focus:border-primary"
+            />
+          </div>
+
+          {/* Live Image Preview */}
+          <div className="space-y-1">
+            <label className="font-label-caps text-[10px] text-on-surface-variant uppercase font-bold block">
+              LIVE AVATAR PREVIEW
+            </label>
+            <div className="w-full h-32 rounded-xl border border-surface-container-high overflow-hidden bg-black/60 relative flex items-center justify-center">
+              {editAvatarUrl.trim() && !editImageError ? (
+                <img
+                  src={editAvatarUrl}
+                  alt="Avatar Preview"
+                  className="w-full h-full object-cover"
+                  onError={() => setEditImageError(true)}
+                  onLoad={() => setEditImageError(false)}
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-1 text-on-surface-variant">
+                  <span className="material-symbols-outlined text-2xl text-error">broken_image</span>
+                  <span className="font-label-caps text-[10px]">
+                    {editImageError ? "Failed to load image preview" : "Enter a valid image URL"}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Role & Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="font-label-caps text-xs text-on-surface-variant uppercase font-bold block">
+                ROLE
+              </label>
+              <select
+                value={editRole}
+                onChange={(e) =>
+                  setEditRole(e.target.value as "PLAYER" | "MODERATOR" | "ADMIN")
+                }
+                className="w-full bg-surface-container border border-surface-container-high rounded-xl px-4 py-3 font-label-caps text-on-surface focus:outline-none focus:border-primary"
+              >
+                <option value="PLAYER">PLAYER</option>
+                <option value="MODERATOR">MODERATOR</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-label-caps text-xs text-on-surface-variant uppercase font-bold block">
+                ACTIVE STATUS
+              </label>
+              <button
+                type="button"
+                onClick={() => setEditIsActive(!editIsActive)}
+                className={`w-full py-3 px-4 rounded-xl border font-label-caps text-xs font-bold uppercase transition-colors ${
+                  editIsActive
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                    : "bg-surface-container text-on-surface-variant border-surface-container-high"
+                }`}
+              >
+                {editIsActive ? "ACTIVE FRAGGER" : "INACTIVE"}
+              </button>
+            </div>
+          </div>
+
+          {/* Change Access Key (Optional) */}
+          <div className="space-y-1 pt-2 border-t border-surface-container-high">
+            <label className="font-label-caps text-xs text-on-surface-variant uppercase font-bold block">
+              CHANGE ACCESS KEY (OPTIONAL)
+            </label>
+            <input
+              type="text"
+              value={editSecretKey}
+              onChange={(e) => setEditSecretKey(e.target.value)}
+              placeholder="Leave blank to keep existing key"
+              className="w-full bg-surface-container border border-surface-container-high rounded-xl px-4 py-3 font-mono text-sm text-on-surface focus:outline-none focus:border-primary"
+            />
+            <span className="font-body text-[11px] text-on-surface-variant/70 block">
+              Enter new secret key only if resetting access key. Existing key is never displayed.
+            </span>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="pt-3 flex items-center justify-end gap-3 border-t border-surface-container-high">
+            <button
+              type="button"
+              onClick={() => setEditingPlayer(null)}
+              disabled={editSaving}
+              className="px-4 py-2.5 rounded-xl border border-surface-container-high text-on-surface-variant font-label-caps text-xs hover:text-on-surface transition-colors"
+            >
+              CANCEL
+            </button>
+            <button
+              type="submit"
+              disabled={editSaving}
+              className="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-label-caps text-xs font-bold shadow-[0_0_15px_rgba(255,77,0,0.3)] hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+            >
+              {editSaving && <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>}
+              {editSaving ? "SAVING..." : "SAVE CHANGES"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
   return (
     <main className="flex-1 w-full max-w-7xl mx-auto px-safe-margin pt-header-safe md:pt-24 pb-stack-lg flex flex-col gap-stack-lg">
       {/* Header Section */}
@@ -490,7 +718,7 @@ export default function AdminDashboardClient({
                 Squad Roster ({players.length})
               </h3>
               <p className="font-body text-body-md text-on-surface-variant text-xs mt-0.5">
-                Manage squad member roles, permissions, and active status.
+                Manage squad member roles, permissions, avatars, and active status.
               </p>
             </div>
 
@@ -628,7 +856,18 @@ export default function AdminDashboardClient({
                     </div>
 
                     {/* Role & Action Controls */}
-                    <div className="flex items-center gap-3 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-surface-container-high">
+                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-surface-container-high">
+                      {/* EDIT Button */}
+                      <button
+                        onClick={() => handleOpenEditModal(p)}
+                        disabled={loadingPlayerId === p.id}
+                        className="font-label-caps text-xs px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-high border border-primary/40 text-primary flex items-center gap-1 transition-colors font-bold"
+                        title="Edit Player Details"
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                        EDIT
+                      </button>
+
                       {/* Role Selector */}
                       <select
                         value={p.role}
@@ -807,13 +1046,16 @@ export default function AdminDashboardClient({
                 </div>
               ))
             ) : (
-              <div className="col-span-2 text-center py-10 text-on-surface-variant font-label-caps text-label-caps glass-panel rounded-xl">
-                NO TEAMS CONFIGURED YET. CLICK "+ ADD TEAM" TO CREATE BGMI MATCH TEAMS.
+              <div className="text-center py-10 text-on-surface-variant font-label-caps text-label-caps glass-panel rounded-xl col-span-2">
+                NO TEAMS CREATED YET. CLICK "+ ADD TEAM" TO CREATE TEAMS FOR MATCHES.
               </div>
             )}
           </div>
         </div>
       )}
+
+      {/* Edit Player Modal Portal */}
+      {editModalContent && createPortal(editModalContent, document.body)}
     </main>
   );
 }
