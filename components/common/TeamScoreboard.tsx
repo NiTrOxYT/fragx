@@ -1,9 +1,17 @@
-import React from "react";
-import { Syne, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+"use client";
+
+import React, { useState } from "react";
+import { Anton, Barlow_Condensed, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { TeamScoreboardData } from "@/lib/services/stats";
 
-const syne = Syne({
-  weight: ["700", "800"],
+const anton = Anton({
+  weight: ["400"],
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const barlowCondensed = Barlow_Condensed({
+  weight: ["600", "700", "800"],
   subsets: ["latin"],
   display: "swap",
 });
@@ -25,6 +33,9 @@ interface TeamScoreboardProps {
 }
 
 export default function TeamScoreboard({ data }: TeamScoreboardProps) {
+  const [team1ImageError, setTeam1ImageError] = useState(false);
+  const [team2ImageError, setTeam2ImageError] = useState(false);
+
   const {
     team1,
     team2,
@@ -34,9 +45,6 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
     totalSessionsPlayed,
     latestSessionDateStr,
   } = data;
-
-  const isTeam1Leading = team1.sessionWins > team2.sessionWins;
-  const isTeam2Leading = team2.sessionWins > team1.sessionWins;
 
   const totalKillsCombined = (team1.totalKills || 0) + (team2.totalKills || 0);
   const team1KillPercent =
@@ -103,7 +111,7 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
 
               {/* Massive Title: EPIC BATTLE */}
               <div className="relative">
-                <h1 className={`text-4xl sm:text-7xl md:text-8xl lg:text-[7.5rem] tracking-tight uppercase font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white via-neutral-100 to-neutral-400 leading-none drop-shadow-[0_10px_30px_rgba(0,0,0,0.9)] ${syne.className}`}>
+                <h1 className={`text-5xl sm:text-7xl md:text-8xl lg:text-[7.5rem] tracking-wider uppercase text-transparent bg-clip-text bg-gradient-to-b from-white via-neutral-100 to-neutral-400 leading-none drop-shadow-[0_10px_30px_rgba(0,0,0,0.9)] ${anton.className}`}>
                   EPIC BATTLE
                 </h1>
                 <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-32 sm:w-60 h-[2px] bg-gradient-to-r from-cyan-500 via-white to-amber-500 opacity-60 blur-[0.5px]" />
@@ -135,24 +143,18 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                     {/* Machined Hardware Shield */}
                     <div className="relative w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-xl sm:rounded-2xl p-1 bg-gradient-to-br from-cyan-400 via-blue-600 to-transparent ring-1 ring-cyan-300/40 shadow-[0_0_25px_rgba(6,182,212,0.5)] flex-shrink-0 flex items-center justify-center overflow-hidden">
                       <div className="w-full h-full rounded-[0.65rem] sm:rounded-[0.85rem] bg-[#030914] flex items-center justify-center overflow-hidden relative">
-                        {team1.avatarUrl ? (
+                        {team1.avatarUrl && !team1ImageError ? (
                           <img
                             src={team1.avatarUrl}
                             alt={team1.name}
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                              const fallback = (e.target as HTMLElement).parentElement?.querySelector('.team-fallback-initial') as HTMLElement;
-                              if (fallback) fallback.style.display = "flex";
-                            }}
+                            onError={() => setTeam1ImageError(true)}
                           />
-                        ) : null}
-                        <span 
-                          className={`team-fallback-initial text-xl sm:text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-cyan-200 to-cyan-400 ${syne.className}`}
-                          style={{ display: team1.avatarUrl ? "none" : "flex" }}
-                        >
-                          {team1.initial}
-                        </span>
+                        ) : (
+                          <span className={`text-2xl sm:text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-cyan-200 to-cyan-400 ${anton.className}`}>
+                            {team1.initial || team1.name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -160,7 +162,7 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                       <span className={`text-[9px] sm:text-xs font-bold tracking-[0.2em] text-cyan-400 uppercase ${jetbrainsMono.className}`}>
                         CHALLENGER SQUAD
                       </span>
-                      <h2 className={`text-lg xs:text-xl sm:text-3xl md:text-4xl text-white font-extrabold tracking-tight uppercase break-words leading-tight ${syne.className}`}>
+                      <h2 className={`text-xl sm:text-3xl md:text-4xl text-white font-extrabold tracking-tight uppercase break-words leading-tight ${barlowCondensed.className}`}>
                         {team1.name}
                       </h2>
                     </div>
@@ -178,7 +180,7 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                     </div>
 
                     <div className="flex items-baseline gap-1">
-                      <span className={`text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white via-cyan-100 to-cyan-400 leading-none drop-shadow-[0_0_35px_rgba(6,182,212,0.7)] ${syne.className}`}>
+                      <span className={`text-6xl sm:text-8xl md:text-9xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white via-cyan-100 to-cyan-400 leading-none drop-shadow-[0_0_35px_rgba(6,182,212,0.7)] ${anton.className}`}>
                         {team1.sessionWins}
                       </span>
                     </div>
@@ -200,7 +202,7 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                 <div className="relative flex items-center justify-center">
                   {/* Glowing Hologram Ring */}
                   <div className="w-16 h-16 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full border border-white/15 bg-white/[0.02] backdrop-blur-md flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.1)]">
-                    <span className={`text-2xl sm:text-4xl md:text-5xl font-extrabold italic text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-amber-300 drop-shadow-[0_0_20px_rgba(255,255,255,0.8)] ${syne.className}`}>
+                    <span className={`text-3xl sm:text-5xl md:text-6xl font-extrabold italic text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-amber-300 drop-shadow-[0_0_20px_rgba(255,255,255,0.8)] ${anton.className}`}>
                       VS
                     </span>
                   </div>
@@ -252,7 +254,7 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                       <span className={`text-[9px] sm:text-xs font-bold tracking-[0.2em] text-amber-400 uppercase ${jetbrainsMono.className}`}>
                         DEFENDING SQUAD
                       </span>
-                      <h2 className={`text-lg xs:text-xl sm:text-3xl md:text-4xl text-white font-extrabold tracking-tight uppercase break-words leading-tight ${syne.className}`}>
+                      <h2 className={`text-xl sm:text-3xl md:text-4xl text-white font-extrabold tracking-tight uppercase break-words leading-tight ${barlowCondensed.className}`}>
                         {team2.name}
                       </h2>
                     </div>
@@ -260,28 +262,21 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                     {/* Machined Hardware Shield */}
                     <div className="relative w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-xl sm:rounded-2xl p-1 bg-gradient-to-br from-amber-300 via-yellow-500 to-transparent ring-1 ring-amber-300/40 shadow-[0_0_25px_rgba(245,158,11,0.5)] flex-shrink-0 flex items-center justify-center overflow-hidden">
                       <div className="w-full h-full rounded-[0.65rem] sm:rounded-[0.85rem] bg-[#120D02] flex items-center justify-center overflow-hidden relative">
-                        {team2.avatarUrl ? (
+                        {team2.avatarUrl && !team2ImageError ? (
                           <img
                             src={team2.avatarUrl}
                             alt={team2.name}
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                              const fallback = (e.target as HTMLElement).parentElement?.querySelector('.team2-fallback-initial') as HTMLElement;
-                              if (fallback) fallback.style.display = "flex";
-                            }}
+                            onError={() => setTeam2ImageError(true)}
                           />
-                        ) : null}
-                        <span 
-                          className={`team2-fallback-initial text-xl sm:text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-amber-200 to-amber-400 ${syne.className}`}
-                          style={{ display: team2.avatarUrl ? "none" : "flex" }}
-                        >
-                          {team2.initial}
-                        </span>
+                        ) : (
+                          <span className={`text-2xl sm:text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-amber-200 to-amber-400 ${anton.className}`}>
+                            {team2.initial || team2.name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
-
 
                   {/* Giant Score Node */}
                   <div className="flex items-end justify-between pt-3 border-t border-amber-500/20 flex-row-reverse">
@@ -295,7 +290,7 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                     </div>
 
                     <div className="flex items-baseline gap-1">
-                      <span className={`text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white via-amber-100 to-amber-400 leading-none drop-shadow-[0_0_35px_rgba(245,158,11,0.7)] ${syne.className}`}>
+                      <span className={`text-6xl sm:text-8xl md:text-9xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white via-amber-100 to-amber-400 leading-none drop-shadow-[0_0_35px_rgba(245,158,11,0.7)] ${anton.className}`}>
                         {team2.sessionWins}
                       </span>
                     </div>
@@ -323,7 +318,7 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                     <span className={`text-[10px] sm:text-[11px] font-bold tracking-[0.15em] text-cyan-400 uppercase ${jetbrainsMono.className}`}>
                       TOTAL ROUNDS
                     </span>
-                    <span className={`text-2xl sm:text-4xl font-extrabold text-white mt-1 ${syne.className}`}>
+                    <span className={`text-3xl sm:text-4xl font-extrabold text-white mt-1 ${anton.className}`}>
                       {totalTournamentMatches}
                     </span>
                     <span className="text-[11px] text-white/50 mt-0.5">Published Tournament Matches</span>
@@ -341,7 +336,7 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                     <span className={`text-[10px] sm:text-[11px] font-bold tracking-[0.15em] text-amber-400 uppercase ${jetbrainsMono.className}`}>
                       TONIGHT'S BATTLES
                     </span>
-                    <span className={`text-2xl sm:text-4xl font-extrabold text-amber-300 mt-1 ${syne.className}`}>
+                    <span className={`text-3xl sm:text-4xl font-extrabold text-amber-300 mt-1 ${anton.className}`}>
                       {tonightMatchCount}
                     </span>
                     <span className="text-[11px] text-white/50 mt-0.5">{latestSessionDateStr}</span>
@@ -359,7 +354,7 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                     <span className={`text-[10px] sm:text-[11px] font-bold tracking-[0.15em] text-amber-400 uppercase ${jetbrainsMono.className}`}>
                       SERIES REMAINING
                     </span>
-                    <span className={`text-2xl sm:text-4xl font-extrabold text-amber-300 mt-1 ${syne.className}`}>
+                    <span className={`text-3xl sm:text-4xl font-extrabold text-amber-300 mt-1 ${anton.className}`}>
                       {matchesRemaining}
                     </span>
                     <span className="text-[11px] text-white/50 mt-0.5">Rounds To Championship</span>
@@ -380,7 +375,7 @@ export default function TeamScoreboard({ data }: TeamScoreboardProps) {
                 ONE GOAL · ONE CHAMPION
               </span>
 
-              <h3 className={`text-2xl sm:text-4xl md:text-5xl font-extrabold uppercase text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 tracking-tight drop-shadow-[0_0_25px_rgba(245,158,11,0.5)] ${syne.className}`}>
+              <h3 className={`text-3xl sm:text-4xl md:text-5xl font-extrabold uppercase text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 tracking-wider drop-shadow-[0_0_25px_rgba(245,158,11,0.5)] ${anton.className}`}>
                 THE WAR IS NOT OVER!
               </h3>
 
