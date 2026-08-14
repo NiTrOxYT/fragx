@@ -55,7 +55,7 @@ export default async function HomePage() {
                 <img
                   src={mainMvp.avatarUrl}
                   alt={mainMvp.name}
-                  className="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500"
+                  className="w-full h-full object-cover opacity-100 transition-all duration-500"
                 />
               </div>
               <div className="absolute -bottom-4 -right-4 bg-surface-container border border-[#D4AF37] rounded-full p-3 shadow-lg flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
